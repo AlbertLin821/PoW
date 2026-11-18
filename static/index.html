@@ -35,21 +35,18 @@
           <label>模型名稱<input id="model" list="model-list" placeholder="先連接服務，或輸入模型名稱"><datalist id="model-list"></datalist></label>
         </form>
         <p id="model-status" role="status" aria-live="polite">尚未連接模型。</p>
+        <label class="check"><input id="ai-consent" type="checkbox">使用此模型分析上傳文件；我同意將可處理段落與格式規格送至上述服務</label>
+        <div id="ai-tools" hidden><details><summary>檢視將送出的資料</summary><pre id="ai-preview"></pre></details></div>
+        <p class="helper">雲端 API 會傳送資料並可能產生費用。未選模型時使用規則分析。</p>
       </details>
       <details id="review" aria-labelledby="review-title">
-        <summary id="review-title">段落角色</summary><span id="counts">尚未載入文件</span>
+        <summary id="review-title">進階段落檢查</summary><span id="counts">尚未載入文件</span>
         <div class="review-toolbar">
-          <label>顯示<select id="filter"><option value="all">所有段落</option><option value="changed">有格式差異</option><option value="keep">保留或略過</option></select></label>
+          <label>顯示<select id="filter"><option value="review">待確認段落</option><option value="all">所有段落</option><option value="changed">有格式差異</option><option value="keep">保留或略過</option></select></label>
           <button id="reset-roles" type="button">還原規則建議</button>
         </div>
         <div id="empty" class="empty">選取文件後，這裡會列出原文、目前格式與角色建議。</div>
         <div id="paragraphs"></div>
-        <div id="ai-tools" hidden>
-          <details><summary>檢視 AI 將接收的資料</summary><p class="helper">只傳可編輯段落的文字、格式與規格。雲端 API 會將這些內容送至供應商；本機端點請確認使用的是本機模型。</p><pre id="ai-preview"></pre></details>
-          <label class="check"><input id="ai-consent" type="checkbox">我已確認模型來源與上述資料範圍，同意送出分析</label>
-          <div class="actions"><button id="analyze-ai" type="button">AI 建議段落角色</button><button id="cancel-ai" type="button" hidden>取消等待</button></div>
-          <p id="ai-status" class="helper" role="status" aria-live="polite">建議只會更新角色選單，確認匯出前不修改文件。</p>
-        </div>
       </details>
       <details id="export-section">
         <summary>清理選項</summary>
@@ -61,9 +58,10 @@
     <div class="document-region">
       <div class="document-toolbar">
         <label class="upload"><span id="upload-label">選取 .docx 文件</span><input id="document-file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
-        <div class="actions"><button id="clear-file" type="button">清除</button><button id="convert-preview" class="primary" type="button">轉換預覽</button><button id="export" type="button" title="依目前規格產生文件與驗證報告，不包含右側手動編輯。">下載轉換檔與報告</button><button id="download-edited" type="button" title="包含右側手動編輯，不附程式轉換的保留驗證報告。" hidden>下載編輯後文件</button></div>
+        <div class="actions"><button id="clear-file" type="button">清除</button><button id="convert-preview" class="primary" type="button">分析並轉換</button><button id="cancel-ai" type="button" hidden>取消處理</button><button id="export" type="button" title="依目前規格產生文件與驗證報告，不包含右側手動編輯。">下載轉換檔與報告</button><button id="download-edited" type="button" title="包含右側手動編輯，不附程式轉換的保留驗證報告。" hidden>下載編輯後文件</button></div>
       </div>
       <p id="filename" class="helper" hidden></p>
+      <div class="actions"><span id="analysis-mode" class="helper">規則分析 · 未選模型</span><button id="inspect-paragraphs" type="button" hidden>進階段落檢查</button></div>
       <div id="warnings" class="warnings" hidden></div>
       <div class="preview-columns">
         <section class="preview-pane" aria-labelledby="original-title">

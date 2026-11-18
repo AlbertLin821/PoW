@@ -2,6 +2,14 @@
 
 日期：2026-11-18。Windows、Python 3.13、Chrome無頭瀏覽器、Microsoft Word 16。本機測試產物及使用者文件不發布。
 
+## 一鍵分析與轉換
+
+主流程更新為設定格式、上傳、分析並轉換，取代下方歷史紀錄的獨立 AI 分析操作。真實 Ollama `qwen3:1.7b` 與兩段合成文件已完成一次按鈕依序請求 `/ai`、`/preview` 並載入可編輯結果，JavaScript錯誤0項。
+
+`tests/one-click.cjs` 使用受控模型回應與真實轉換端點，驗證規則模式、模型授權阻擋、AI先於轉換、待確認篩選、中文段落序號、人工角色優先、上傳及改規格保留同模型授權、換模型清除授權、失敗不轉換、取消及規格修改時忽略遲到回應。320／375／1920px主介面無水平溢出，JavaScript錯誤0項。下載僅在目前規格完成轉換後啟用。
+
+瀏覽器測試需要現代 Chrome 與 `puppeteer-core`，設定 `POW_PUPPETEER` 為套件路徑、`POW_TEST_DOCX` 為兩段可編輯內容的測試DOCX後，於已啟動localhost服務時執行 `node tests/one-click.cjs`。可用 `tests/test_workbench.py` 的 `fixture()` 建立合成文件。受控模型回應用於競態及失敗測試，不把它當成真實模型品質驗證。Python測試仍為21項通過，主介面靜態及渲染設計檢查均為0 FAIL、0 REFLEX、0 WARN。
+
 ## Extend 元件與真實文件回歸
 
 目前使用正式 Extend DOCX Viewer／Editor，已取代下方歷史紀錄中的 docx-preview 及自製工具列。實際協作文件含170個主文件段落，42段可修正。原先失敗是把 `w:pPr/w:tabs/w:tab` 定位點定義算成內文 Tab；移除定位點設定後觸發原文保留檢查。修正文字擷取及 Tab 計數，新增包含兩個定位點定義和一個實際 Tab 的回歸案例。
