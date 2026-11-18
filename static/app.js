@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const state = {token:'', defaults:null, doc:null, rows:[], roles:new Map(), reasons:new Map(), epoch:0, ai:null, providerReady:false, models:[], connectionVersion:0,limits:{file_mb:32,preview_mb:32},revision:0,converted:false,previewJobs:new Map()};
+const state = {token:'', defaults:null, doc:null, rows:[], roles:new Map(), reasons:new Map(), epoch:0, ai:null, providerReady:false, models:[], connectionVersion:0,limits:{file_mb:32,preview_mb:32},revision:0,converted:false,previewJobs:new Map(),viewers:{}};
 const roleNames = {body:'正文',heading1:'章標題',heading2:'節標題',heading3:'小節標題',heading4:'次小節標題',keep:'保留原樣'};
 const fields = [
  ['chinese_font','中文字型','text',null,null,true],['latin_font','英文字型','text',null,null,true],
@@ -29,24 +29,38 @@ function modelSelectionStatus(){
  else connectionStatus('pending','尚未確認模型');
 }
 function toggleSettings(open){$('#settings-panel').hidden=!open;$('.workbench').classList.toggle('settings-open',open);$('#toggle-settings').setAttribute('aria-expanded',String(open));}
+function updateViewer(side,values){
+ const data=state.viewers[side]={...state.viewers[side],...values};const bar=$(`[data-viewer="${side}"]`);
+ const input=bar.querySelector('[data-viewer-page]');if(document.activeElement!==input)input.value=data.page||1;input.max=data.total||1;input.disabled=!data.total;
+ bar.querySelector('[data-viewer-total]').textContent='/ '+(data.total||0);
+ bar.querySelector('[data-viewer-action=previous]').disabled=!data.total||data.page<=1;
+ bar.querySelector('[data-viewer-action=next]').disabled=!data.total||data.page>=data.total;
+ bar.querySelector('[data-viewer-zoom]').disabled=!data.total;
+}
+function viewerCommand(side,action,value){const viewer=state.viewers[side];if(viewer?.total)$('#'+side+'-preview').contentWindow.postMessage({type:'viewer-command',job:viewer.job,action,value},'*');}
 function invalidatePreview(){state.revision++;if(state.converted)$('#converted-state').textContent='設定已變更';}
 function exportBody(){return {profile:profile(),selections:[...state.roles].map(([paragraph_id,role])=>({paragraph_id,role})),clean_leading:$('#clean-leading').checked};}
-function clearPreviews(){for(const task of state.previewJobs.values()){clearTimeout(task.timer);task.resolve(false);}state.previewJobs.clear();for(const side of ['original','converted']){$('#'+side+'-preview').hidden=true;$('#'+side+'-preview').src='/static/preview.html';$('#'+side+'-placeholder').hidden=false;$('#'+side+'-placeholder').textContent=side==='original'?'選取文件後顯示預覽':'轉換後顯示預覽';}state.converted=false;$('#converted-state').textContent='尚未轉換';}
+function clearPreviews(){for(const task of state.previewJobs.values()){clearTimeout(task.timer);task.resolve(false);}state.previewJobs.clear();for(const side of ['original','converted']){updateViewer(side,{job:null,page:1,total:0});$(`[data-viewer="${side}"] [data-viewer-zoom]`).value='fit';$('#'+side+'-preview').hidden=true;$('#'+side+'-preview').src='/static/preview.html';$('#'+side+'-placeholder').hidden=false;$('#'+side+'-placeholder').textContent=side==='original'?'選取文件後顯示預覽':'轉換後顯示預覽';}state.converted=false;$('#converted-state').textContent='尚未轉換';}
 function showPreview(side,blob){
  const frame=$('#'+side+'-preview'),placeholder=$('#'+side+'-placeholder');
+ updateViewer(side,{job:null,page:1,total:0});$(`[data-viewer="${side}"] [data-viewer-zoom]`).value='fit';
  placeholder.hidden=false;frame.hidden=true;
  if(blob.size>state.limits.preview_mb*1024*1024){placeholder.textContent='文件較大，請下載後檢視';return Promise.resolve(false);}
  placeholder.textContent='正在產生預覽…';
  for(const [id,task]of state.previewJobs){if(task.side===side){clearTimeout(task.timer);task.resolve(false);state.previewJobs.delete(id);}}
- const job=crypto.randomUUID();return new Promise(resolve=>{const timer=setTimeout(()=>{state.previewJobs.delete(job);placeholder.textContent='預覽逾時，仍可下載文件';resolve(false);},60000);state.previewJobs.set(job,{side,blob,resolve,timer,sent:false});frame.src='/static/preview.html?job='+job;});
+ const job=crypto.randomUUID();updateViewer(side,{job,page:1,total:0});return new Promise(resolve=>{const timer=setTimeout(()=>{state.previewJobs.delete(job);placeholder.textContent='預覽逾時，仍可下載文件';resolve(false);},60000);state.previewJobs.set(job,{side,blob,resolve,timer,sent:false});frame.src='/static/preview.html?job='+job;});
 }
 window.addEventListener('message',async event=>{
+ if(event.data?.type==='preview-state'){
+  for(const side of ['original','converted'])if(event.source===$('#'+side+'-preview').contentWindow&&state.viewers[side]?.job===event.data.job&&Number.isInteger(event.data.total)&&event.data.total>0&&Number.isInteger(event.data.page)&&event.data.page>=1&&event.data.page<=event.data.total)updateViewer(side,{page:event.data.page,total:event.data.total});
+  return;
+ }
  const task=state.previewJobs.get(event.data?.job);if(!task)return;
  const frame=$('#'+task.side+'-preview');if(event.source!==frame.contentWindow)return;
  if(event.data.type==='preview-ready'&&!task.sent){task.sent=true;const buffer=await task.blob.arrayBuffer();if(!state.previewJobs.has(event.data.job))return;frame.contentWindow.postMessage({type:'render-docx',job:event.data.job,buffer},'*',[buffer]);}
  else if(['preview-rendered','preview-error'].includes(event.data.type)){
   clearTimeout(task.timer);state.previewJobs.delete(event.data.job);const ok=event.data.type==='preview-rendered';frame.hidden=!ok;$('#'+task.side+'-placeholder').hidden=ok;
-  if(!ok)$('#'+task.side+'-placeholder').textContent='無法預覽此文件，仍可下載檢視';task.resolve(ok);
+  if(!ok)$('#'+task.side+'-placeholder').textContent='無法預覽此文件，仍可下載檢視';else updateViewer(task.side,{page:1,total:event.data.total||1});task.resolve(ok);
  }
 });
 function detailError(data){if(typeof data.detail==='string')return data.detail;if(Array.isArray(data.detail))return '格式設定不合法：'+data.detail.map(x=>x.loc.slice(-1)+': '+x.msg).join('；');return '請求失敗，請重試。';}
@@ -121,6 +135,11 @@ function action(id,fn){$(id).addEventListener('click',()=>Promise.resolve().then
 async function init(){
  $('#profile-settings').open=false;$('#model-settings').open=false;
  $('#toggle-settings').addEventListener('click',()=>toggleSettings($('#settings-panel').hidden));
+ for(const side of ['original','converted']){const bar=$(`[data-viewer="${side}"]`);
+  for(const action of ['previous','next'])bar.querySelector(`[data-viewer-action=${action}]`).addEventListener('click',()=>viewerCommand(side,'page',state.viewers[side].page+(action==='next'?1:-1)));
+  bar.querySelector('[data-viewer-page]').addEventListener('change',e=>{const viewer=state.viewers[side];const page=Math.max(1,Math.min(viewer.total,Number(e.target.value)||1));e.target.value=page;viewerCommand(side,'page',page);});
+  bar.querySelector('[data-viewer-zoom]').addEventListener('change',e=>viewerCommand(side,'zoom',e.target.value));
+ }
  $('#model-indicator').addEventListener('click',()=>{toggleSettings(true);$('#model-settings').open=true;$('#provider').focus();});
  $('#connection').addEventListener('mouseleave',()=>delete $('#connection').dataset.dismissed);
  $('#connection').addEventListener('focusout',()=>delete $('#connection').dataset.dismissed);

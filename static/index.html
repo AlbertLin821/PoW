@@ -2,10 +2,11 @@
 <html lang="zh-Hant">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="在本機檢查 Word 格式、確認段落角色並匯出修正版。"><title>PoW 文件格式工作台</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script></head>
 <body>
-<header class="shell"><button id="toggle-settings" type="button" aria-expanded="false" aria-controls="settings-panel">設定</button><a class="wordmark" href="/">PoW</a><span>文件格式工作台</span><span class="local-label">本機服務</span></header>
+<header class="shell"><a class="wordmark" href="/">PoW</a><span>文件格式工作台</span><span class="local-label">本機服務</span></header>
 <main class="shell">
   <noscript>此工具需要 JavaScript。請在瀏覽器啟用後重新整理。</noscript>
   <div class="status-bar">
+    <button id="toggle-settings" class="icon-button" type="button" aria-label="開關設定" title="設定" aria-expanded="false" aria-controls="settings-panel"><svg class="settings-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9.7 3-.6 2.1-1.7 1-2.1-.5-2.2 3.8 1.5 1.6v2l-1.5 1.6 2.2 3.8 2.1-.5 1.7 1 .6 2.1h4.6l.6-2.1 1.7-1 2.1.5 2.2-3.8-1.5-1.6v-2l1.5-1.6-2.2-3.8-2.1.5-1.7-1-.6-2.1Z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
     <div id="connection" class="connection" data-state="pending">
       <button id="model-indicator" type="button" aria-describedby="connection-tooltip"><span class="status-light" aria-hidden="true"></span><span id="connection-label" aria-live="polite">Ollama · 未選擇模型</span></button>
       <span id="connection-tooltip" class="connection-tooltip" role="tooltip">尚未連接模型</span>
@@ -67,10 +68,22 @@
       <div class="preview-columns">
         <section class="preview-pane" aria-labelledby="original-title">
           <div class="preview-heading"><h2 id="original-title">原始文件</h2><span class="preview-kind" title="瀏覽器版面預覽，實際分頁以 Word 為準。">版面預覽</span></div>
+          <div class="viewer-toolbar" data-viewer="original" aria-label="原始文件預覽工具列">
+            <button type="button" data-viewer-action="previous" aria-label="原始文件上一頁" disabled><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m14 6-6 6 6 6"/></svg></button>
+            <label class="page-control">預覽頁<input type="number" min="1" value="1" data-viewer-page aria-label="原始文件預覽頁碼" disabled><span data-viewer-total>/ 0</span></label>
+            <button type="button" data-viewer-action="next" aria-label="原始文件下一頁" disabled><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m10 6 6 6-6 6"/></svg></button>
+            <label class="zoom-control">縮放<select data-viewer-zoom aria-label="原始文件縮放" disabled><option value="fit">符合寬度</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select></label>
+          </div>
           <div class="preview-stage"><p id="original-placeholder" class="preview-placeholder">選取文件後顯示預覽</p><iframe id="original-preview" title="原始 Word 文件預覽" sandbox="allow-scripts" src="/static/preview.html" hidden></iframe></div>
         </section>
         <section class="preview-pane" aria-labelledby="converted-title">
           <div class="preview-heading"><h2 id="converted-title">轉換後文件</h2><span id="converted-state" class="preview-kind">尚未轉換</span></div>
+          <div class="viewer-toolbar" data-viewer="converted" aria-label="轉換後文件預覽工具列">
+            <button type="button" data-viewer-action="previous" aria-label="轉換後文件上一頁" disabled><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m14 6-6 6 6 6"/></svg></button>
+            <label class="page-control">預覽頁<input type="number" min="1" value="1" data-viewer-page aria-label="轉換後文件預覽頁碼" disabled><span data-viewer-total>/ 0</span></label>
+            <button type="button" data-viewer-action="next" aria-label="轉換後文件下一頁" disabled><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m10 6 6 6-6 6"/></svg></button>
+            <label class="zoom-control">縮放<select data-viewer-zoom aria-label="轉換後文件縮放" disabled><option value="fit">符合寬度</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select></label>
+          </div>
           <div class="preview-stage"><p id="converted-placeholder" class="preview-placeholder">轉換後顯示預覽</p><iframe id="converted-preview" title="轉換後 Word 文件預覽" sandbox="allow-scripts" src="/static/preview.html" hidden></iframe></div>
         </section>
       </div>
