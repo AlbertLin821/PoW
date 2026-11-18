@@ -1,0 +1,5 @@
+# Track public project files explicitly.
+/*
+!/.gitignore
+!/README.md
+!/docs/
