@@ -74,7 +74,7 @@ API key 保存在本機服務記憶體，不寫入瀏覽器儲存區或設定檔
 
 ## 預覽依賴
 
-`static/vendor`附帶docx-preview 0.4.1（Apache-2.0）及JSZip 3.10.1（MIT授權選項）的發行檔與授權文字，不需要CDN或執行npm建置。兩個JavaScript檔合計約173 KB。保留第三方原始授權；以docx-preview將DOCX轉為HTML呈現，其分頁及欄位支援有限。
+`static/vendor`附帶docx-preview 0.4.1（Apache-2.0）及JSZip 3.10.2（MIT授權選項）的發行檔與授權文字，不需要CDN或執行npm建置。兩個JavaScript檔合計約173 KB。保留第三方原始授權；以docx-preview將DOCX轉為HTML呈現，其分頁及欄位支援有限。
 
 ## 處理原則
 
