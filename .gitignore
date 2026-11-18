@@ -3,3 +3,15 @@
 !/.gitignore
 !/README.md
 !/docs/
+!/pow_app/
+!/static/
+!/tests/
+!/requirements.txt
+!/requirements-dev.txt
+!/start.ps1
+!/start.cmd
+!/DESIGN.md
+**/__pycache__/
+**/.pytest_cache/
+**/*.pyc
+**/.hallmark/

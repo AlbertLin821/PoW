@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="在本機檢查 Word 格式、確認段落角色並匯出修正版。"><title>PoW 文件格式工作台</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script></head>
+<body>
+<header class="shell"><a class="wordmark" href="/">PoW</a><span>文件格式工作台</span><span class="local-label">本機服務</span></header>
+<main class="shell">
+  <h1>整理 Word，保留原文。</h1>
+  <p class="intro">設定規格，確認段落角色，再下載修正版。</p>
+  <noscript>此工具需要 JavaScript。請在瀏覽器啟用後重新整理。</noscript>
+  <div id="notice" role="status" aria-live="polite">正在連接本機服務…</div>
+  <div class="workbench">
+    <aside>
+      <details id="profile-settings" open>
+        <summary id="profile-title">格式規格</summary>
+        <p class="helper">以下是可編輯的起始值，不代表所有文件規定。</p>
+        <form id="profile-form"><div id="profile-fields" class="fields"></div>
+          <label>正文對齊<select name="alignment"><option value="both">左右對齊</option><option value="left">靠左</option><option value="center">置中</option><option value="right">靠右</option></select></label>
+          <label class="check"><input type="checkbox" name="new_page_chapters" checked>章標題從新頁開始</label>
+        </form>
+        <div class="actions"><button id="save-profile" type="button">匯出規格</button><label class="file-button">匯入規格<input id="load-profile" type="file" accept=".json,application/json"></label><button id="reset-profile" type="button">還原起始值</button></div>
+      </details>
+      <details id="model-settings"><summary>模型設定（選用）</summary>
+        <p class="helper">可先手動確認角色，不連接 AI 也能修正。</p>
+        <form id="provider-form">
+          <label>模型來源<select id="provider"><option value="ollama">本機 Ollama</option><option value="openai">OpenAI API</option><option value="compatible">本機 OpenAI 相容服務</option></select></label>
+          <label>端點<input id="endpoint" type="url" value="http://127.0.0.1:11434" required></label>
+          <label>API key<input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="本機 Ollama 通常不需要"></label>
+          <p class="helper">金鑰僅留在本機服務記憶體；關閉服務後清除。</p>
+          <button type="submit" id="connect">連接並載入模型</button>
+          <label>模型名稱<input id="model" list="model-list" placeholder="先連接服務，或輸入模型名稱"><datalist id="model-list"></datalist></label>
+        </form>
+        <p id="model-status" role="status" aria-live="polite">尚未連接模型。</p>
+      </details>
+    </aside>
+    <div class="document-region">
+      <section aria-labelledby="document-title">
+        <div class="section-head"><h2 id="document-title">待整理文件</h2><button id="clear-file" type="button">清除文件</button></div>
+        <label class="upload">選取 .docx 文件（最大 15 MB）<input id="document-file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
+        <p id="filename" class="helper">檔案會傳至這台電腦的 PoW 服務，不覆寫原檔。</p>
+        <div id="warnings" class="warnings" hidden></div>
+        <p class="scope">僅修正主文件一般段落。表格與含圖片、欄位、公式、編號的段落保留；不新增頁碼，不提供 Word 分頁預覽。</p>
+      </section>
+      <section id="review" aria-labelledby="review-title">
+        <div class="section-head"><h2 id="review-title">段落與修正預覽</h2><span id="counts">尚未載入文件</span></div>
+        <div class="review-toolbar">
+          <label>顯示<select id="filter"><option value="all">所有段落</option><option value="changed">有格式差異</option><option value="keep">保留或略過</option></select></label>
+          <button id="reset-roles" type="button">還原規則建議</button>
+        </div>
+        <div id="empty" class="empty">選取文件後，這裡會列出原文、目前格式與角色建議。</div>
+        <div id="paragraphs"></div>
+        <div id="ai-tools" hidden>
+          <details><summary>檢視 AI 將接收的資料</summary><p class="helper">只傳可編輯段落的文字、格式與規格。雲端 API 會將這些內容送至供應商；本機端點請確認使用的是本機模型。</p><pre id="ai-preview"></pre></details>
+          <label class="check"><input id="ai-consent" type="checkbox">我已確認模型來源與上述資料範圍，同意送出分析</label>
+          <div class="actions"><button id="analyze-ai" type="button">AI 建議段落角色</button><button id="cancel-ai" type="button" hidden>取消等待</button></div>
+          <p id="ai-status" class="helper" role="status" aria-live="polite">建議只會更新角色選單，確認匯出前不修改文件。</p>
+        </div>
+      </section>
+      <section id="export-section" aria-labelledby="export-title">
+        <h2 id="export-title">確認並匯出</h2>
+        <label class="check"><input id="clean-leading" type="checkbox">移除已確認為正文的段首空白與 Tab，改用首行縮排</label>
+        <p class="helper">預設保留原字元。標題、段落內部空白與所有略過段落不清理。</p>
+        <p id="page-preview" class="helper"></p>
+        <button id="export" class="primary" type="button">下載修正版與檢查報告</button>
+        <p class="helper">下載 ZIP 內含 corrected.docx 與 report.json。匯出後請用 Word 確認實際分頁。</p>
+      </section>
+    </div>
+  </div>
+  <footer>PoW 處理原檔的副本。文件保留於服務記憶體，清除、逾期或停止服務後移除。</footer>
+</main>
+</body></html>

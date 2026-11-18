@@ -1,0 +1,1 @@
+"""PoW local document workbench."""
