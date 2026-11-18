@@ -12,6 +12,7 @@
   --color-border: #75808c;
   --color-error: #a42525;
   --color-success: #21633e;
+  --color-pending: #9a5700;
   --color-transparent: transparent;
   --radius-control: 4px;
   --container: 1320px;
@@ -25,7 +26,16 @@ header { display: flex; align-items: center; gap: var(--space-md); min-height: 7
 main { padding-block: var(--space-xl); }
 h1 { font-size: var(--text-2xl); line-height: 1.3; }
 h2 { font-size: var(--text-lg); line-height: 1.4; }
-#notice { min-height: 28px; margin-block: var(--space-lg); overflow-wrap: anywhere; }
+.status-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-block: var(--space-lg); }
+#notice { overflow-wrap: anywhere; font-size: var(--text-sm); }
+.connection { position: relative; max-width: 100%; }
+#model-indicator { display: flex; align-items: center; gap: var(--space-xs); border: 0; background: var(--color-transparent); padding-inline: 0; text-align: left; }
+#connection-label { overflow-wrap: anywhere; min-width: 0; }
+.status-light { width: 9px; height: 9px; flex-shrink: 0; border-radius: 50%; background: var(--color-pending); }
+.connection[data-state=ready] .status-light { background: var(--color-success); }
+.connection[data-state=error] .status-light { background: var(--color-error); }
+.connection-tooltip { display: none; position: absolute; left: 0; top: 100%; width: max-content; max-width: min(360px, 80vw); padding: var(--space-sm); background: var(--color-ink); color: var(--color-paper); border-radius: var(--radius-control); font-size: var(--text-sm); z-index: var(--z-tooltip); }
+.connection:not([data-dismissed=true]):hover .connection-tooltip, .connection:not([data-dismissed=true]):focus-within .connection-tooltip { display: block; }
 #notice[data-error=true], .error { color: var(--color-error); }
 .workbench { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: var(--space-xl); align-items: start; }
 aside { min-width: 0; }

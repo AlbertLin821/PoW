@@ -5,10 +5,16 @@
 <header class="shell"><a class="wordmark" href="/">PoW</a><span>文件格式工作台</span><span class="local-label">本機服務</span></header>
 <main class="shell">
   <noscript>此工具需要 JavaScript。請在瀏覽器啟用後重新整理。</noscript>
-  <div id="notice" role="status" aria-live="polite">正在連接本機服務…</div>
+  <div class="status-bar">
+    <div id="connection" class="connection" data-state="pending">
+      <button id="model-indicator" type="button" aria-describedby="connection-tooltip"><span class="status-light" aria-hidden="true"></span><span id="connection-label" aria-live="polite">Ollama · 未選擇模型</span></button>
+      <span id="connection-tooltip" class="connection-tooltip" role="tooltip">尚未連接模型。點選可展開模型設定。</span>
+    </div>
+    <div id="notice" role="status" aria-live="polite" hidden></div>
+  </div>
   <div class="workbench">
     <aside>
-      <details id="profile-settings" open>
+      <details id="profile-settings">
         <summary id="profile-title">格式規格</summary>
         <p class="helper">以下是可編輯的起始值，不代表所有文件規定。</p>
         <form id="profile-form"><div id="profile-fields" class="fields"></div>
@@ -59,7 +65,6 @@
         <p class="helper">預設保留原字元。標題、段落內部空白與所有略過段落不清理。</p>
         <p id="page-preview" class="helper"></p>
         <button id="export" class="primary" type="button">下載修正版與檢查報告</button>
-        <p class="helper">下載 ZIP 內含 corrected.docx 與 report.json。匯出後請用 Word 確認實際分頁。</p>
       </section>
     </div>
   </div>
