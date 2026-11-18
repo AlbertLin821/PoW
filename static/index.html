@@ -2,18 +2,18 @@
 <html lang="zh-Hant">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="在本機檢查 Word 格式、確認段落角色並匯出修正版。"><title>PoW 文件格式工作台</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script></head>
 <body>
-<header class="shell"><a class="wordmark" href="/">PoW</a><span>文件格式工作台</span><span class="local-label">本機服務</span></header>
+<header class="shell"><button id="toggle-settings" type="button" aria-expanded="false" aria-controls="settings-panel">設定</button><a class="wordmark" href="/">PoW</a><span>文件格式工作台</span><span class="local-label">本機服務</span></header>
 <main class="shell">
   <noscript>此工具需要 JavaScript。請在瀏覽器啟用後重新整理。</noscript>
   <div class="status-bar">
     <div id="connection" class="connection" data-state="pending">
       <button id="model-indicator" type="button" aria-describedby="connection-tooltip"><span class="status-light" aria-hidden="true"></span><span id="connection-label" aria-live="polite">Ollama · 未選擇模型</span></button>
-      <span id="connection-tooltip" class="connection-tooltip" role="tooltip">尚未連接模型。點選可展開模型設定。</span>
+      <span id="connection-tooltip" class="connection-tooltip" role="tooltip">尚未連接模型</span>
     </div>
     <div id="notice" role="status" aria-live="polite" hidden></div>
   </div>
   <div class="workbench">
-    <aside>
+    <aside id="settings-panel" hidden>
       <details id="profile-settings">
         <summary id="profile-title">格式規格</summary>
         <p class="helper">以下是可編輯的起始值，不代表所有文件規定。</p>
@@ -35,17 +35,8 @@
         </form>
         <p id="model-status" role="status" aria-live="polite">尚未連接模型。</p>
       </details>
-    </aside>
-    <div class="document-region">
-      <section aria-labelledby="document-title">
-        <div class="section-head"><h2 id="document-title">待整理文件</h2><button id="clear-file" type="button">清除文件</button></div>
-        <label class="upload">選取 .docx 文件（最大 15 MB）<input id="document-file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
-        <p id="filename" class="helper">檔案會傳至這台電腦的 PoW 服務，不覆寫原檔。</p>
-        <div id="warnings" class="warnings" hidden></div>
-        <p class="scope">僅修正主文件一般段落。表格與含圖片、欄位、公式、編號的段落保留；不新增頁碼，不提供 Word 分頁預覽。</p>
-      </section>
-      <section id="review" aria-labelledby="review-title">
-        <div class="section-head"><h2 id="review-title">段落與修正預覽</h2><span id="counts">尚未載入文件</span></div>
+      <details id="review" aria-labelledby="review-title">
+        <summary id="review-title">段落角色</summary><span id="counts">尚未載入文件</span>
         <div class="review-toolbar">
           <label>顯示<select id="filter"><option value="all">所有段落</option><option value="changed">有格式差異</option><option value="keep">保留或略過</option></select></label>
           <button id="reset-roles" type="button">還原規則建議</button>
@@ -58,16 +49,32 @@
           <div class="actions"><button id="analyze-ai" type="button">AI 建議段落角色</button><button id="cancel-ai" type="button" hidden>取消等待</button></div>
           <p id="ai-status" class="helper" role="status" aria-live="polite">建議只會更新角色選單，確認匯出前不修改文件。</p>
         </div>
-      </section>
-      <section id="export-section" aria-labelledby="export-title">
-        <h2 id="export-title">確認並匯出</h2>
+      </details>
+      <details id="export-section">
+        <summary>清理選項</summary>
         <label class="check"><input id="clean-leading" type="checkbox">移除已確認為正文的段首空白與 Tab，改用首行縮排</label>
         <p class="helper">預設保留原字元。標題、段落內部空白與所有略過段落不清理。</p>
         <p id="page-preview" class="helper"></p>
-        <button id="export" class="primary" type="button">下載修正版與檢查報告</button>
-      </section>
+      </details>
+    </aside>
+    <div class="document-region">
+      <div class="document-toolbar">
+        <label class="upload"><span id="upload-label">選取 .docx 文件</span><input id="document-file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
+        <div class="actions"><button id="clear-file" type="button">清除</button><button id="convert-preview" class="primary" type="button">轉換預覽</button><button id="export" type="button">下載修正版與報告</button></div>
+      </div>
+      <p id="filename" class="helper" hidden></p>
+      <div id="warnings" class="warnings" hidden></div>
+      <div class="preview-columns">
+        <section class="preview-pane" aria-labelledby="original-title">
+          <div class="preview-heading"><h2 id="original-title">原始文件</h2><span class="preview-kind" title="瀏覽器版面預覽，實際分頁以 Word 為準。">版面預覽</span></div>
+          <div class="preview-stage"><p id="original-placeholder" class="preview-placeholder">選取文件後顯示預覽</p><iframe id="original-preview" title="原始 Word 文件預覽" sandbox="allow-scripts" src="/static/preview.html" hidden></iframe></div>
+        </section>
+        <section class="preview-pane" aria-labelledby="converted-title">
+          <div class="preview-heading"><h2 id="converted-title">轉換後文件</h2><span id="converted-state" class="preview-kind">尚未轉換</span></div>
+          <div class="preview-stage"><p id="converted-placeholder" class="preview-placeholder">轉換後顯示預覽</p><iframe id="converted-preview" title="轉換後 Word 文件預覽" sandbox="allow-scripts" src="/static/preview.html" hidden></iframe></div>
+        </section>
+      </div>
     </div>
   </div>
-  <footer>PoW 處理原檔的副本。文件保留於服務記憶體，清除、逾期或停止服務後移除。</footer>
 </main>
 </body></html>

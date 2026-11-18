@@ -3,11 +3,12 @@ import re
 import zipfile
 from lxml import etree as ET
 from .schemas import Profile
+from .limits import LIMITS, MB
 
 W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 NS = {'w': W, 'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
-MAX_FILE = 15 * 1024 * 1024
-MAX_UNPACKED = 60 * 1024 * 1024
+MAX_FILE = LIMITS['file_mb'] * MB
+MAX_UNPACKED = LIMITS['unpacked_mb'] * MB
 
 class DocumentError(ValueError):
     pass
@@ -61,12 +62,14 @@ def guess(text, outline):
 class WordDocument:
     def __init__(self, data):
         if len(data)>MAX_FILE:
-            raise DocumentError('檔案超過 15 MB 上限。')
+            raise DocumentError(f"檔案超過本次啟動的 {LIMITS['file_mb']} MB 上限。")
         try:
             with zipfile.ZipFile(io.BytesIO(data)) as z:
                 infos=z.infolist()
                 if len(infos)>2000 or sum(i.file_size for i in infos)>MAX_UNPACKED:
                     raise DocumentError('解壓縮後容量或項目數超過上限。')
+                if any(i.filename.endswith('.xml') and i.file_size>24*MB for i in infos):
+                    raise DocumentError('單一 XML 超過 24 MB 上限。')
                 names=[i.filename for i in infos]
                 if len(set(names))!=len(names) or any(i.flag_bits & 1 for i in infos):
                     raise DocumentError('不支援重複項目或加密文件。')
@@ -205,7 +208,7 @@ class WordDocument:
             setprop(pp,'outlineLvl',val=int(role[-1])-1 if heading else 9)
             setprop(pp,'keepNext',val=1 if heading else 0)
             setprop(pp,'keepLines',val=1 if heading else 0)
-            setprop(pp,'pageBreakBefore',val=1 if role=='heading1' and profile.new_page_chapters else 0)
+            setprop(pp,'pageBreakBefore',val=1 if role=='heading1' and profile.new_page_chapters and i>0 else 0)
             setprop(pp,'snapToGrid',val=0)
             for r in p.findall(q('r')):
                 rp=r.find(q('rPr'))

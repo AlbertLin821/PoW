@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from .schemas import Profile, Provider, ExportRequest, AIRequest
 from .documents import WordDocument, DocumentError, MAX_FILE
 from . import providers
+from .limits import LIMITS, MB
 
 STATIC=Path(__file__).resolve().parents[1]/'static'
 @asynccontextmanager
@@ -55,7 +56,7 @@ async def local_guard(request:Request,call_next):
     response.headers['X-Content-Type-Options']='nosniff'
     response.headers['Referrer-Policy']='no-referrer'
     response.headers['Cache-Control']='no-store'
-    response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    response.headers['Content-Security-Policy']=("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: blob:; font-src data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'" if request.url.path=='/static/preview.html' else "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
     return response
 
 @app.exception_handler(DocumentError)
@@ -71,7 +72,7 @@ async def unexpected(request,exc):
 async def index():return FileResponse(STATIC/'index.html')
 
 @app.get('/api/session')
-async def session():return {'token':TOKEN,'profile':Profile().model_dump(),'api_key_available':bool(__import__('os').environ.get('OPENAI_API_KEY'))}
+async def session():return {'token':TOKEN,'profile':Profile().model_dump(),'limits':LIMITS,'api_key_available':bool(__import__('os').environ.get('OPENAI_API_KEY'))}
 
 def get_doc(doc_id):
     now=time.monotonic()
@@ -86,13 +87,13 @@ async def upload(request:Request):
     data=bytearray()
     async for chunk in request.stream():
         data.extend(chunk)
-        if len(data)>MAX_FILE:raise HTTPException(413,'檔案超過 15 MB 上限。')
+        if len(data)>MAX_FILE:raise HTTPException(413,f"檔案超過本次啟動的 {LIMITS['file_mb']} MB 上限。")
     if not data:raise DocumentError('請先選取 DOCX 文件。')
     try:doc=WordDocument(bytes(data))
     except (ValueError,TypeError,OverflowError) as e:
         if isinstance(e,DocumentError):raise
         raise DocumentError('文件屬性異常，無法安全解析。') from e
-    while documents and (len(documents)>=8 or sum(sum(len(v) for v in x['doc'].parts.values()) for x in documents.values())+sum(len(v) for v in doc.parts.values())>120*1024*1024):
+    while documents and (len(documents)>=8 or sum(sum(len(v) for v in x['doc'].parts.values()) for x in documents.values())+sum(len(v) for v in doc.parts.values())>LIMITS['cache_mb']*MB):
         oldest=min(documents,key=lambda k:documents[k]['time']);documents.pop(oldest)
     doc_id=secrets.token_urlsafe(18);documents[doc_id]={'doc':doc,'time':time.monotonic()}
     return {'document_id':doc_id,**doc.summary()}
@@ -109,6 +110,11 @@ async def export(doc_id:str,body:ExportRequest):
         z.writestr('corrected.docx',data)
         z.writestr('report.json',json.dumps(report,ensure_ascii=False,indent=2))
     return Response(output.getvalue(),media_type='application/zip',headers={'Content-Disposition':'attachment; filename="PoW-result.zip"'})
+
+@app.post('/api/documents/{doc_id}/preview')
+async def converted_preview(doc_id:str,body:ExportRequest):
+    data,_=get_doc(doc_id)['doc'].export(body.profile,body.selections,body.clean_leading)
+    return Response(data,media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
 
 @app.post('/api/provider')
 async def configure(body:Provider):

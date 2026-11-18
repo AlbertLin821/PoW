@@ -118,3 +118,29 @@ def test_provider_failure_never_creates_fake_suggestions():
     import asyncio
     with patch.object(providers,'request',AsyncMock(side_effect=providers.ModelError('離線'))):
         with pytest.raises(providers.ModelError):asyncio.run(providers.classify(Provider(),WordDocument(fixture()).rows,Profile(),'x'))
+
+def test_adaptive_limits_are_bounded():
+    from pow_app.limits import choose_limits, MB
+    small=choose_limits(1024*MB);large=choose_limits(64*1024*MB)
+    assert small['file_mb']==32 and large['file_mb']==256
+    assert small['unpacked_mb']==128 and large['unpacked_mb']==1024
+    assert large['preview_mb']==64
+
+def test_preview_returns_the_actual_transformed_docx():
+    with TestClient(app) as client:
+        h={'x-pow-token':client.get('/api/session').json()['token']}
+        doc=client.post('/api/documents',content=fixture(),headers=h).json()
+        body={'profile':Profile().model_dump(),'selections':[{'paragraph_id':'p-1','role':'heading1'}]}
+        response=client.post('/api/documents/'+doc['document_id']+'/preview',json=body,headers=h)
+        assert response.status_code==200
+        changed=WordDocument(response.content)
+        assert changed.rows[0]['formats'][0]['size']==18
+        assert not changed.rows[0]['page_break_before']
+        assert changed.parts['word/media/test.bin']==b'unchanged binary asset'
+
+def test_large_image_document_over_old_limit_is_accepted():
+    import random
+    data=fixture(extras={'word/media/image.bin':random.Random(0).randbytes(16*1024*1024)})
+    assert len(data)>15*1024*1024
+    d=WordDocument(data)
+    assert len(d.rows)==2
