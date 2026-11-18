@@ -29,13 +29,14 @@ const suggestions=[
   const load=async()=>{
    await page.goto('http://127.0.0.1:8765');
    await page.waitForFunction(()=>document.querySelector('[name=body_size]')?.value==='12');
-   await(await page.$('#document-file')).uploadFile(fixture);
+   const [chooser]=await Promise.all([page.waitForFileChooser(),page.click('#upload-document')]);
+   await chooser.accept([fixture]);
    await page.waitForFunction(()=>document.querySelector('#filename').hidden===false);
   };
   const configure=async()=>{
    await page.click('#model-indicator');await page.click('#connect');
    await page.waitForFunction(()=>document.querySelector('#model-status').textContent.includes('已連接'));
-   await page.type('#model','test-model');
+   await page.$eval('#model',e=>e.value='');await page.type('#model','test-model');
   };
   const convert=async()=>{
    await page.click('#convert-preview');
@@ -45,17 +46,20 @@ const suggestions=[
   assert.equal(await page.$eval('#settings-panel',e=>e.hidden),false);
   assert.equal(await page.$eval('#settings-panel',e=>e.getBoundingClientRect().left),0);
   assert.equal(await page.$('#analysis-mode'),null);
+  assert.equal(await page.$('#page-preview'),null);assert.equal(await page.$('#ai-consent'),null);
+  assert.deepEqual(await page.$$eval('#save-profile,.file-button,#reset-profile',es=>es.map(e=>e.textContent)),['匯出','匯入','還原']);
+  assert.equal(await page.$eval('#upload-document',e=>e.getBoundingClientRect().width),44);
   await convert();assert.equal(calls.length,1);assert.equal(calls[0].selections.length,2);
   assert.match(await page.$eval('#notice',e=>e.textContent),/規則分析與轉換/);
   console.log('PASS rule analysis and conversion in one click');
 
-  await load();await configure();calls.length=0;
-  await page.click('#convert-preview');await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('同意'));
+  await load();calls.length=0;await page.click('#model-indicator');await page.type('#model','test-model');
+  await page.click('#convert-preview');await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('請先連接'));
   assert.equal(calls.length,0);
-  await page.click('#ai-consent');await page.click('#toggle-settings');
+  await configure();await page.click('#toggle-settings');
   await convert();assert.equal(calls[0],'ai');assert.equal(calls[1].selections[0].role,'heading1');
   assert.match(await page.$eval('#inspect-paragraphs',e=>e.title),/1 段待確認/);
-  console.log('PASS consent gate and AI then conversion in one click');
+  console.log('PASS connection guard and direct AI then conversion in one click');
 
   if(await page.$eval('#settings-panel',e=>e.hidden))await page.click('#toggle-settings');
   await page.click('#inspect-paragraphs');assert.equal(await page.$eval('#filter',e=>e.value),'review');
@@ -63,13 +67,11 @@ const suggestions=[
   assert.equal(await page.$eval('.paragraph-head strong',e=>e.textContent),'第 1 段');
   await page.select('select[data-id="p-1"]','heading2');calls.length=0;
   await page.click('#toggle-settings');await convert();assert.equal(calls[1].selections[0].role,'heading2');
-  assert.equal(await page.$eval('#ai-consent',e=>e.checked),true);
   await page.$eval('[name=body_size]',e=>{e.value='13';e.dispatchEvent(new Event('input',{bubbles:true}));});
-  assert.equal(await page.$eval('#ai-consent',e=>e.checked),true);
   await page.click('#clear-file');await(await page.$('#document-file')).uploadFile(fixture);
   await page.waitForFunction(()=>document.querySelector('#filename').hidden===false);
-  assert.equal(await page.$eval('#ai-consent',e=>e.checked),true);
-  console.log('PASS review filter, human labels, manual override and consent scope');
+  assert.equal(await page.$eval('#model',e=>e.value),'test-model');
+  console.log('PASS review filter, human labels, manual override and selected model retained');
 
   mode='failure';calls.length=0;await page.click('#convert-preview');
   await page.waitForFunction(()=>document.querySelector('#converted-state').textContent==='分析失敗，未轉換');
@@ -91,8 +93,8 @@ const suggestions=[
   await page.$eval('[name=body_size]',e=>{e.value='14';e.dispatchEvent(new Event('input',{bubbles:true}));});release();release=null;
   await page.waitForFunction(()=>!document.querySelector('#convert-preview').disabled);
   assert.deepEqual(calls,['ai']);
-  await page.click('#model-indicator');await page.type('#model','-changed');assert.equal(await page.$eval('#ai-consent',e=>e.checked),false);
-  console.log('PASS settings mutation cancels in-flight work; model changes reset consent');
+  await page.click('#model-indicator');await page.type('#model','-changed');
+  console.log('PASS settings mutation cancels in-flight work; model remains editable');
   await page.click('#toggle-settings');
   for(const width of [320,375,1920]){await page.setViewport({width,height:900});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight));}
   assert.deepEqual(errors,[]);console.log('PASS responsive layout and no JavaScript errors');

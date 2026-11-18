@@ -96,7 +96,6 @@ function differences(r,p,role){
 function render(){
  if(!state.defaults)return;
  let p;try{p=profileUnchecked();}catch{return;}
- $('#page-preview').textContent=`頁面將設為 A4 單欄，上 ${p.top}、下 ${p.bottom}、左 ${p.left}、右 ${p.right} cm。`;
  const box=$('#paragraphs');box.replaceChildren();const filter=$('#filter').value;
  $('#empty').hidden=!!state.doc;$('#ai-tools').hidden=!state.doc;
  $('#inspect-paragraphs').hidden=!state.doc;
@@ -151,10 +150,10 @@ async function init(){
  $('#connection').addEventListener('focusout',()=>delete $('#connection').dataset.dismissed);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#connection').dataset.dismissed='true';});
  for(const [name,title,type,min,max,wide] of fields){const label=node('label',title,wide?'wide':'');const input=node('input');input.name=name;input.type=type;input.required=true;if(type==='number'){input.min=min;input.max=max;input.step='.5';}else input.maxLength=80;label.append(input);const basic=['chinese_font','latin_font','body_size','first_line_chars','line_spacing','paragraph_after'].includes(name);$(basic?'#profile-fields':'#advanced-fields').append(label);}
- const response=await fetch('/api/session');if(!response.ok)throw new Error('本機服務無法連接。');const data=await response.json();state.token=data.token;state.defaults=data.profile;state.limits=data.limits||state.limits;$('#upload-label').textContent=`選取 .docx 文件（上限 ${state.limits.file_mb} MB）`;setProfile(data.profile);notice('');connectionStatus('pending','尚未連接模型');
+ const response=await fetch('/api/session');if(!response.ok)throw new Error('本機服務無法連接。');const data=await response.json();state.token=data.token;state.defaults=data.profile;state.limits=data.limits||state.limits;$('#upload-document').title=`上傳 DOCX 文件（上限 ${state.limits.file_mb} MB）`;setProfile(data.profile);notice('');connectionStatus('pending','尚未連接模型');
  $('#profile-form').addEventListener('input',()=>{if(state.ai)cancelAI();invalidatePreview();render();});
  $('#filter').addEventListener('change',render);$('#clean-leading').addEventListener('change',()=>{if(state.ai)cancelAI();invalidatePreview();render();});
- $('#ai-consent').addEventListener('change',()=>{if(state.ai)cancelAI();});
+ action('#upload-document',()=>$('#document-file').click());
  action('#inspect-paragraphs',()=>toggleSettings(true,'review'));
  $('#document-file').addEventListener('change',e=>{const file=e.target.files[0];upload(file).catch(e=>notice(e.message,true));});
  action('#clear-file',async()=>{await clearFile();notice('文件已清除。');});
@@ -162,9 +161,9 @@ async function init(){
  action('#reset-profile',()=>{setProfile(state.defaults);notice('已還原起始規格。');});
  action('#save-profile',()=>blobDownload(new Blob([JSON.stringify(profile(),null,2)],{type:'application/json'}),'PoW-profile.json'));
  $('#load-profile').addEventListener('change',async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>20000)throw new Error('規格檔過大。');const p=JSON.parse(await f.text());if(Object.keys(p).sort().join()!==Object.keys(state.defaults).sort().join())throw new Error('規格欄位不完整或含未知欄位。');for(const [k,v]of Object.entries(p)){if(typeof v!==typeof state.defaults[k])throw new Error('規格欄位型別不正確。');}setProfile(p);profile();notice('已匯入規格，請確認數值。');}catch(e){notice(e.message,true);}finally{e.target.value='';}});
- $('#provider').addEventListener('change',()=>{cancelAI();state.connectionVersion++;state.providerReady=false;state.models=[];$('#ai-consent').checked=false;$('#model').value='';$('#model-list').replaceChildren();$('#endpoint').disabled=$('#provider').value==='openai';$('#endpoint').value=$('#provider').value==='openai'?'https://api.openai.com/v1':$('#provider').value==='ollama'?'http://127.0.0.1:11434':'http://127.0.0.1:1234/v1';$('#api-key').value='';$('#model-status').textContent='模型來源已變更，請重新連接。';modelSelectionStatus();});
- for(const id of ['#endpoint','#api-key'])$(id).addEventListener('input',()=>{state.connectionVersion++;state.providerReady=false;$('#ai-consent').checked=false;if(state.ai)cancelAI();modelSelectionStatus();});
- $('#model').addEventListener('input',()=>{if(state.ai)cancelAI();$('#ai-consent').checked=false;modelSelectionStatus();});
+ $('#provider').addEventListener('change',()=>{cancelAI();state.connectionVersion++;state.providerReady=false;state.models=[];$('#model').value='';$('#model-list').replaceChildren();$('#endpoint').disabled=$('#provider').value==='openai';$('#endpoint').value=$('#provider').value==='openai'?'https://api.openai.com/v1':$('#provider').value==='ollama'?'http://127.0.0.1:11434':'http://127.0.0.1:1234/v1';$('#api-key').value='';$('#model-status').textContent='模型來源已變更，請重新連接。';modelSelectionStatus();});
+ for(const id of ['#endpoint','#api-key'])$(id).addEventListener('input',()=>{state.connectionVersion++;state.providerReady=false;if(state.ai)cancelAI();modelSelectionStatus();});
+ $('#model').addEventListener('input',()=>{if(state.ai)cancelAI();modelSelectionStatus();});
  $('#provider-form').addEventListener('submit',async e=>{e.preventDefault();if(state.ai)cancelAI();const version=++state.connectionVersion;const button=$('#connect');button.disabled=true;button.setAttribute('aria-busy','true');state.providerReady=false;connectionStatus('pending','連接中');$('#model-status').textContent='正在連接模型服務…';try{
   await api('/provider',{method:'POST',json:{kind:$('#provider').value,endpoint:$('#endpoint').value,api_key:$('#api-key').value,model:''}});if(version!==state.connectionVersion)return;$('#api-key').value='';
   const data=await(await api('/models')).json();
@@ -175,9 +174,9 @@ async function init(){
  action('#convert-preview',async()=>{
   if(!state.doc)throw new Error('請先選取文件。');if(!state.canExport)throw new Error('此文件目前只能檢查。');
   const p=profile(),model=$('#model').value.trim();
-  if(model&&(!state.providerReady||!$('#ai-consent').checked)){
+  if(model&&!state.providerReady){
    toggleSettings(true,'model-settings');
-   throw new Error(!state.providerReady?'請先連接選定的模型服務。':'請在模型設定同意將文件段落送至所選服務。');
+   throw new Error('請先連接選定的模型服務。');
   }
   if(state.converted&&!confirm('重新轉換會取代右側的手動編輯，是否繼續？'))return;
   const epoch=state.epoch,doc=state.doc,controller=new AbortController(),button=$('#convert-preview');
