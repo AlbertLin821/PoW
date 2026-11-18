@@ -11,6 +11,8 @@
 
 本機調整：修正 registry 相對匯入路徑、加入 Lucide IconPlaceholder 適配器、在縮放完成後重算 viewer 當前頁碼，以及 editor 的 `onController` 回呼供主介面下載目前編輯內容。元件原有功能介面保留，未宣稱所有工具列功能都已逐項驗證。
 
+`patch-pagination.mjs` 在建置時套用0.15.0引擎的匯入政策修正：只有原始文件的唯讀 frame 將段首 `lastRenderedPageBreak` 提示轉為記憶體模型的分頁屬性，避免摘要併入封面。原始檔案位元組不變，該frame沒有文件匯出入口。轉換後編輯器仍依編輯內容重新排版，不強制套用原檔的全部快取分頁。升級引擎時若修正錨點或段首辨識函式不再匹配，建置會失敗，須重新檢查；不直接修改 `node_modules`。原檔提示可能過期，因此這仍不是Word排版引擎的一致性保證。
+
 `preview.tsx` 負責隔離 iframe 與父頁的檔案訊息、初始化 WASM、取得編輯後 DOCX。使用引擎支援的主執行緒匯入路徑，避免不具 same-origin 權限的 iframe 建立模組 worker 失敗。大型文件載入時可能短暫阻塞該 frame。
 
 一般使用者不必建置；修改來源後在專案根目錄執行 `npm ci` 及 `npm run build:viewer`，並提交新的 `static/extend/`。建置輸出全部由本機提供，不依賴 CDN。

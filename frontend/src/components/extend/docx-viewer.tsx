@@ -1530,7 +1530,7 @@ function DocxViewerContent({
                   pageBackgroundColor={effectiveIsDark ? "#0a0a0a" : undefined}
                   pageGapBackgroundColor={viewerBackgroundColor}
                   pageVirtualization={pageVirtualization}
-                  deferInitialPaginationPaint={false}
+                  deferInitialPaginationPaint={true}
                   onPageCountChange={handlePageCountChange}
                 />
               </div>

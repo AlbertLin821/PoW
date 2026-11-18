@@ -1,5 +1,13 @@
 # 第一版驗證紀錄
 
+## 封面與摘要瀏覽器分頁
+
+使用者畫面顯示摘要接在封面日期下方。原檔摘要段首有 `lastRenderedPageBreak`，而非明確 `pageBreakBefore`；Word依自身字型及行高分頁，Extend估算時未可靠採用該提示。先前只驗證Word/PDF分頁及元件載入，沒有驗證瀏覽器每頁的內容歸屬，漏掉此差異。
+
+修正：原始唯讀frame匯入時僅在記憶體模型採用段首已儲存分頁，保留原始位元組；等待初始分頁穩定後顯示。後端對已辨識的前置頁標題明確保留相應段前分頁，報告新增 `layout_changes`。不將正文中途的快取分頁普遍寫成硬分頁，也不把全部舊分頁強套到可編輯結果。
+
+合成fixture及完整協作文件均在瀏覽器檢查：原始與轉換後第一頁包含封面而不包含摘要，第二頁包含摘要，JavaScript錯誤0項。`tests/viewer-pagination.cjs` 可用 `POW_PAGINATION_DOCX` 指向含「測試大學報告」及下一段段首 `lastRenderedPageBreak` 的「摘要」合成DOCX重跑。另以Word開啟最新輸出仍為21頁，匯出PDF確認封面與摘要各自分頁。26項Python測試與一鍵操作回歸通過。這只驗證本次分頁錯誤，未宣稱所有Word版面完全一致。
+
 日期：2026-11-18。Windows、Python 3.13、Chrome無頭瀏覽器、Microsoft Word 16。本機測試產物及使用者文件不發布。
 
 ## 精簡上傳與設定文案

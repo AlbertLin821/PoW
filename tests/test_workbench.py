@@ -172,6 +172,16 @@ def test_cover_and_front_titles_keep_layout_and_page_breaks():
     assert result.rows[2]['page_break_before']
 
 
+def test_saved_front_page_boundary_becomes_explicit_without_changing_text():
+    paragraphs='<w:p><w:r><w:t>測試大學報告</w:t></w:r></w:p><w:p><w:r><w:lastRenderedPageBreak/><w:t>摘要</w:t></w:r></w:p><w:p><w:r><w:t>正文</w:t><w:lastRenderedPageBreak/><w:t>同段續文</w:t></w:r></w:p>'
+    d=WordDocument(fixture(paragraphs));out,report=d.export(Profile(),[])
+    result=WordDocument(out)
+    assert result.rows[1]['page_break_before']
+    assert not result.rows[2]['page_break_before']
+    assert [r['text'] for r in result.rows]==[r['text'] for r in d.rows]
+    assert [c['paragraph_id'] for c in report['layout_changes']]==['p-2']
+
+
 def test_numbered_heading_formats_text_without_removing_numbering_or_indents():
     paragraphs='<w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="900"/></w:tabs><w:numPr><w:ilvl w:val="0"/><w:numId w:val="7"/></w:numPr><w:ind w:left="900" w:hanging="300"/><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>研究目的</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="4"/><w:numId w:val="7"/></w:numPr></w:pPr><w:r><w:t>編號清單</w:t></w:r></w:p>'
     d=WordDocument(fixture(paragraphs));assert d.rows[0]['editable'];assert not d.rows[1]['editable']

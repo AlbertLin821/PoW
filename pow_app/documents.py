@@ -47,6 +47,13 @@ def text_of(p):
     nodes=p.xpath('.//w:t[not(ancestor::w:pPr or ancestor::w:rPr)] | .//w:tab[not(ancestor::w:pPr or ancestor::w:rPr)] | .//w:br[not(ancestor::w:pPr or ancestor::w:rPr)] | .//w:cr[not(ancestor::w:pPr or ancestor::w:rPr)]',namespaces=NS)
     return ''.join((n.text or '') if n.tag==q('t') else '\t' if n.tag==q('tab') else '\n' for n in nodes)
 
+def starts_with_saved_page_break(p):
+    for node in p.iter():
+        if node.tag==q('lastRenderedPageBreak'):return True
+        if node.tag==q('t') and (node.text or '').strip():return False
+        if node.tag in (q('drawing'),q('pict'),q('object')):return False
+    return False
+
 def guess(text, outline):
     if outline is not None and outline.isdigit() and int(outline)<4:
         return 'heading'+str(int(outline)+1)
@@ -119,6 +126,7 @@ class WordDocument:
             region='封面' if cover and i<boundary else '前置頁標題' if normalized[i] in titles else None
             if region:
                 row.update(role='keep',editable=False,skip_reason=region+'保留版面',preserved_region=region)
+                row['front_page_start']=normalized[i] in titles and starts_with_saved_page_break(self.paras[i])
         if cover:self.warnings.append('已辨識封面與前置頁標題，保留原版面；正文與可處理標題依規格修正。')
 
     def chain(self, sid):
@@ -209,6 +217,13 @@ class WordDocument:
             node=ET.SubElement(parent,q(name))
             for k,v in attrs.items():node.set(q(k),str(v))
             return node
+        layout_changes=[]
+        for p,row in zip(paras,self.rows):
+            if row.get('front_page_start') and not row['page_break_before']:
+                pp=p.find(q('pPr'))
+                if pp is None:pp=ET.Element(q('pPr'));p.insert(0,pp)
+                setprop(pp,'pageBreakBefore',val=1)
+                layout_changes.append({'paragraph_id':row['id'],'reason':'前置頁標題依Word已儲存分頁明確從新頁開始。'})
         for i,(p,row) in enumerate(zip(paras,self.rows)):
             role=roles.get(row['id'],'keep')
             if role=='keep':continue
@@ -268,6 +283,6 @@ class WordDocument:
         with zipfile.ZipFile(io.BytesIO(result)) as z:
             if not all(z.read(n)==v for n,v in self.parts.items() if n!='word/document.xml'):
                 raise DocumentError('封裝保留檢查未通過，已停止匯出。')
-        report={'changes':changes,'verification':{'text_preserved_except_approved_leading':True,'other_package_parts_unchanged':True,'word_rendered':False},
+        report={'changes':changes,'layout_changes':layout_changes,'verification':{'text_preserved_except_approved_leading':True,'other_package_parts_unchanged':True,'word_rendered':False},
                 'profile':profile.model_dump(),'warnings':self.warnings,'page_layout':'已套用 A4 單欄及指定頁邊界；不新增頁碼。'}
         return result,report
