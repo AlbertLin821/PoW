@@ -108,6 +108,18 @@ class WordDocument:
         if self.root.xpath('/w:document/w:body/w:sdt',namespaces=NS):
             self.warnings.append('主文件內容控制項內的段落不列入修正。')
         self.rows=[self.inspect(i,p) for i,p in enumerate(self.paras)]
+        self.protect_front_matter()
+
+    def protect_front_matter(self):
+        titles={'摘要','中文摘要','英文摘要','abstract','目錄','圖目錄','表目錄','致謝','contents','listoffigures','listoftables'}
+        normalized=[re.sub(r'\s+','',r['text']).lower() for r in self.rows]
+        boundary=next((i for i,t in enumerate(normalized[:80]) if t in titles),None)
+        cover=boundary is not None and not any(r['role'].startswith('heading') for r in self.rows[:boundary]) and any(re.search(r'大學|學系|報告|論文|指導|作者|university|supervisor',r['text'],re.I) for r in self.rows[:min(boundary,15)])
+        for i,row in enumerate(self.rows):
+            region='封面' if cover and i<boundary else '前置頁標題' if normalized[i] in titles else None
+            if region:
+                row.update(role='keep',editable=False,skip_reason=region+'保留版面',preserved_region=region)
+        if cover:self.warnings.append('已辨識封面與前置頁標題，保留原版面；正文與可處理標題依規格修正。')
 
     def chain(self, sid):
         found=[];seen=set()
@@ -149,7 +161,9 @@ class WordDocument:
         text=text_of(p);pp,_=self.properties(p)
         complex_tags={'fldChar','fldSimple','instrText','drawing','pict','object','sdt','hyperlink','oMath','oMathPara','sym','ruby','footnoteReference','endnoteReference','commentReference'}
         reasons=sorted({ET.QName(n).localname for n in p.iter() if ET.QName(n).localname in complex_tags})
-        if 'numPr' in pp:reasons.append('自動編號')
+        numbered='numPr' in pp
+        outline=pp.get('outlineLvl',{}).get('val','9')
+        if numbered and (not outline.isdigit() or int(outline)>3):reasons.append('自動編號清單')
         if not text.strip():reasons.append('空白段落')
         runs=p.findall(q('r'));formats=[]
         for r in runs:
@@ -174,6 +188,7 @@ class WordDocument:
                 'outline_level':int(pp.get('outlineLvl',{}).get('val',9)),
                 'page_break_before':pp.get('pageBreakBefore',{}).get('val','0') not in ('0','false','off'),
                 'tabs':len(p.xpath('.//w:tab[not(ancestor::w:pPr or ancestor::w:rPr)]',namespaces=NS)),'leading':len(text)-len(text.lstrip(' \t\u3000')),
+                'numbered_heading':numbered and outline.isdigit() and int(outline)<4,
                 'style':value(p.find(q('pPr')),'pStyle',default=self.default_style)}
 
     def summary(self):
@@ -200,16 +215,18 @@ class WordDocument:
             if not row['editable']:raise DocumentError('不能修改含複雜物件或編號的段落，請選擇保留。')
             pp=p.find(q('pPr'))
             if pp is None:pp=ET.Element(q('pPr'));p.insert(0,pp)
-            for tag in ['tabs','contextualSpacing']:
+            for tag in (['contextualSpacing'] if row['numbered_heading'] else ['tabs','contextualSpacing']):
                 for node in pp.findall(q(tag)):pp.remove(node)
             heading=role.startswith('heading');size=getattr(profile,role) if heading else profile.body_size
             setprop(pp,'jc',val='left' if heading else profile.alignment)
-            setprop(pp,'ind',left=0,right=0,firstLine=0 if heading else round(size*profile.first_line_chars*20),firstLineChars=0 if heading else round(profile.first_line_chars*100))
+            if not row['numbered_heading']:
+                setprop(pp,'ind',left=0,right=0,firstLine=0 if heading else round(size*profile.first_line_chars*20),firstLineChars=0 if heading else round(profile.first_line_chars*100))
             setprop(pp,'spacing',before=round(size*20) if heading and role!='heading1' else 0,after=round(size*20) if role=='heading1' else round(profile.paragraph_after*20),line=round(profile.line_spacing*240),lineRule='auto')
             setprop(pp,'outlineLvl',val=int(role[-1])-1 if heading else 9)
             setprop(pp,'keepNext',val=1 if heading else 0)
             setprop(pp,'keepLines',val=1 if heading else 0)
-            setprop(pp,'pageBreakBefore',val=1 if role=='heading1' and profile.new_page_chapters and i>0 else 0)
+            page_break=row['page_break_before'] or (role=='heading1' and profile.new_page_chapters and i>0)
+            setprop(pp,'pageBreakBefore',val=1 if page_break else 0)
             setprop(pp,'snapToGrid',val=0)
             for r in p.findall(q('r')):
                 rp=r.find(q('rPr'))

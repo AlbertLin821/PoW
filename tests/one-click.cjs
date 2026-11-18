@@ -11,6 +11,7 @@ const suggestions=[
  const browser=await puppeteer.launch({executablePath:process.env.POW_CHROME||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
  try{
   const page=await browser.newPage();const errors=[];const calls=[];let mode='success';let release;
+  await page.setViewport({width:1600,height:900});
   page.on('pageerror',e=>errors.push(e.message));
   page.on('dialog',dialog=>dialog.accept());
   await page.setRequestInterception(true);
@@ -41,6 +42,9 @@ const suggestions=[
    await page.waitForFunction(()=>document.querySelector('#converted-state').textContent==='已轉換，可編輯',{timeout:120000});
   };
   await load();assert.equal(await page.$eval('#review',e=>e.open),false);
+  assert.equal(await page.$eval('#settings-panel',e=>e.hidden),false);
+  assert.equal(await page.$eval('#settings-panel',e=>e.getBoundingClientRect().left),0);
+  assert.equal(await page.$('#analysis-mode'),null);
   await convert();assert.equal(calls.length,1);assert.equal(calls[0].selections.length,2);
   assert.match(await page.$eval('#notice',e=>e.textContent),/規則分析與轉換/);
   console.log('PASS rule analysis and conversion in one click');
@@ -50,9 +54,10 @@ const suggestions=[
   assert.equal(calls.length,0);
   await page.click('#ai-consent');await page.click('#toggle-settings');
   await convert();assert.equal(calls[0],'ai');assert.equal(calls[1].selections[0].role,'heading1');
-  assert.match(await page.$eval('#inspect-paragraphs',e=>e.textContent),/1 段待確認/);
+  assert.match(await page.$eval('#inspect-paragraphs',e=>e.title),/1 段待確認/);
   console.log('PASS consent gate and AI then conversion in one click');
 
+  if(await page.$eval('#settings-panel',e=>e.hidden))await page.click('#toggle-settings');
   await page.click('#inspect-paragraphs');assert.equal(await page.$eval('#filter',e=>e.value),'review');
   assert.equal(await page.$$eval('.paragraph',es=>es.length),1);
   assert.equal(await page.$eval('.paragraph-head strong',e=>e.textContent),'第 1 段');
@@ -89,7 +94,7 @@ const suggestions=[
   await page.click('#model-indicator');await page.type('#model','-changed');assert.equal(await page.$eval('#ai-consent',e=>e.checked),false);
   console.log('PASS settings mutation cancels in-flight work; model changes reset consent');
   await page.click('#toggle-settings');
-  for(const width of [320,375,1920]){await page.setViewport({width,height:900});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
+  for(const width of [320,375,1920]){await page.setViewport({width,height:900});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight));}
   assert.deepEqual(errors,[]);console.log('PASS responsive layout and no JavaScript errors');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exit(1)});

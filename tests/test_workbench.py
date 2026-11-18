@@ -160,3 +160,46 @@ def test_sandbox_can_fetch_document_assets_but_not_api():
         assert response.headers['access-control-allow-origin']=='*'
         assert client.get('/api/session',headers={'origin':'null'}).status_code==403
         assert client.get('/static/app.js',headers={'origin':'null'}).status_code==403
+
+
+def test_cover_and_front_titles_keep_layout_and_page_breaks():
+    paragraphs='<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="48"/></w:rPr><w:t>測試大學系統報告</w:t></w:r></w:p><w:p><w:pPr><w:pageBreakBefore/><w:jc w:val="center"/></w:pPr><w:r><w:t>摘要</w:t></w:r></w:p><w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t>測試正文</w:t></w:r></w:p>'
+    d=WordDocument(fixture(paragraphs))
+    assert [r['editable'] for r in d.rows]==[False,False,True]
+    out,_=d.export(Profile(),[Selection(paragraph_id='p-3',role='body')])
+    result=WordDocument(out)
+    assert [ET.tostring(p) for p in result.paras[:2]]==[ET.tostring(p) for p in d.paras[:2]]
+    assert result.rows[2]['page_break_before']
+
+
+def test_numbered_heading_formats_text_without_removing_numbering_or_indents():
+    paragraphs='<w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="900"/></w:tabs><w:numPr><w:ilvl w:val="0"/><w:numId w:val="7"/></w:numPr><w:ind w:left="900" w:hanging="300"/><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>研究目的</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="4"/><w:numId w:val="7"/></w:numPr></w:pPr><w:r><w:t>編號清單</w:t></w:r></w:p>'
+    d=WordDocument(fixture(paragraphs));assert d.rows[0]['editable'];assert not d.rows[1]['editable']
+    out,_=d.export(Profile(),[Selection(paragraph_id='p-1',role='heading1')])
+    changed=WordDocument(out)
+    assert changed.rows[0]['formats'][0]['size']==18
+    for tag in ['numPr','tabs','ind']:
+        assert ET.tostring(d.paras[0].find('w:pPr/w:'+tag,NS))==ET.tostring(changed.paras[0].find('w:pPr/w:'+tag,NS))
+
+
+def test_ai_cannot_silently_flatten_existing_outline():
+    import asyncio
+    d=WordDocument(fixture('<w:p><w:pPr><w:outlineLvl w:val="1"/></w:pPr><w:r><w:t>既有節標題</w:t></w:r></w:p>'))
+    reply={'message':{'content':json.dumps({'suggestions':[{'paragraph_id':'p-1','role':'body','reason':'誤判','needs_review':False}]})}}
+    with patch.object(providers,'request',AsyncMock(return_value=reply)):
+        result=asyncio.run(providers.classify(Provider(),d.rows,Profile(),'local-model'))
+    assert result['suggestions'][0]['role']=='heading2'
+    assert result['suggestions'][0]['needs_review']
+
+
+def test_ai_batches_large_documents_and_preserves_complete_ids():
+    import asyncio
+    d=WordDocument(fixture(''.join('<w:p><w:r><w:t>測試正文</w:t></w:r></w:p>' for _ in range(30))))
+    async def respond(config,method,path,payload):
+        paragraphs=json.loads(payload['messages'][1]['content'])['paragraphs']
+        assert len(paragraphs)<=24
+        return {'message':{'content':json.dumps({'suggestions':[{'paragraph_id':r['paragraph_id'],'role':'body','reason':'正文','needs_review':False} for r in paragraphs]})}}
+    with patch.object(providers,'request',AsyncMock(side_effect=respond)) as request:
+        result=asyncio.run(providers.classify(Provider(),d.rows,Profile(),'local-model'))
+    assert request.call_count==2
+    assert {s['paragraph_id'] for s in result['suggestions']}=={r['id'] for r in d.rows}

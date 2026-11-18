@@ -5,23 +5,20 @@
 <header class="shell"><a class="wordmark" href="/">PoW</a><span>文件格式工作台</span><span class="local-label">本機服務</span></header>
 <main class="shell">
   <noscript>此工具需要 JavaScript。請在瀏覽器啟用後重新整理。</noscript>
-  <div class="status-bar">
-    <button id="toggle-settings" class="icon-button" type="button" aria-label="開關設定" title="設定" aria-expanded="false" aria-controls="settings-panel"><svg class="settings-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9.7 3-.6 2.1-1.7 1-2.1-.5-2.2 3.8 1.5 1.6v2l-1.5 1.6 2.2 3.8 2.1-.5 1.7 1 .6 2.1h4.6l.6-2.1 1.7-1 2.1.5 2.2-3.8-1.5-1.6v-2l1.5-1.6-2.2-3.8-2.1.5-1.7-1-.6-2.1Z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
-    <div id="connection" class="connection" data-state="pending">
-      <button id="model-indicator" type="button" aria-describedby="connection-tooltip"><span class="status-light" aria-hidden="true"></span><span id="connection-label" aria-live="polite">Ollama · 未選擇模型</span></button>
-      <span id="connection-tooltip" class="connection-tooltip" role="tooltip">尚未連接模型</span>
-    </div>
-    <div id="notice" role="status" aria-live="polite" hidden></div>
-  </div>
   <div class="workbench">
     <aside id="settings-panel" hidden>
+      <nav class="settings-nav" aria-label="設定分類"><button type="button" data-panel="profile-settings" aria-pressed="true">格式</button><button type="button" data-panel="model-settings" aria-pressed="false">模型</button><button id="inspect-paragraphs" type="button" data-panel="review" aria-pressed="false" hidden>檢查</button></nav>
+      <div class="settings-content">
       <details id="profile-settings">
         <summary id="profile-title">格式規格</summary>
-        <p class="helper">以下是可編輯的起始值，不代表所有文件規定。</p>
         <form id="profile-form"><div id="profile-fields" class="fields"></div>
+          <details id="advanced-format"><summary>標題與頁面設定</summary><div id="advanced-fields" class="fields"></div>
           <label>正文對齊<select name="alignment"><option value="both">左右對齊</option><option value="left">靠左</option><option value="center">置中</option><option value="right">靠右</option></select></label>
           <label class="check"><input type="checkbox" name="new_page_chapters" checked>章標題從新頁開始</label>
+          <p id="page-preview" class="helper"></p>
+          </details>
         </form>
+        <label class="check"><input id="clean-leading" type="checkbox">以首行縮排取代正文段首空白與 Tab</label>
         <div class="actions"><button id="save-profile" type="button">匯出規格</button><label class="file-button">匯入規格<input id="load-profile" type="file" accept=".json,application/json"></label><button id="reset-profile" type="button">還原起始值</button></div>
       </details>
       <details id="model-settings"><summary>模型設定（選用）</summary>
@@ -41,6 +38,7 @@
       </details>
       <details id="review" aria-labelledby="review-title">
         <summary id="review-title">進階段落檢查</summary><span id="counts">尚未載入文件</span>
+        <div id="warnings" class="warnings" hidden></div>
         <div class="review-toolbar">
           <label>顯示<select id="filter"><option value="review">待確認段落</option><option value="all">所有段落</option><option value="changed">有格式差異</option><option value="keep">保留或略過</option></select></label>
           <button id="reset-roles" type="button">還原規則建議</button>
@@ -48,21 +46,20 @@
         <div id="empty" class="empty">選取文件後，這裡會列出原文、目前格式與角色建議。</div>
         <div id="paragraphs"></div>
       </details>
-      <details id="export-section">
-        <summary>清理選項</summary>
-        <label class="check"><input id="clean-leading" type="checkbox">移除已確認為正文的段首空白與 Tab，改用首行縮排</label>
-        <p class="helper">預設保留原字元。標題、段落內部空白與所有略過段落不清理。</p>
-        <p id="page-preview" class="helper"></p>
-      </details>
+      </div>
     </aside>
     <div class="document-region">
+      <div class="status-bar">
+        <button id="toggle-settings" class="icon-button" type="button" aria-label="開關設定" title="設定" aria-expanded="false" aria-controls="settings-panel"><svg class="settings-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9.7 3-.6 2.1-1.7 1-2.1-.5-2.2 3.8 1.5 1.6v2l-1.5 1.6 2.2 3.8 2.1-.5 1.7 1 .6 2.1h4.6l.6-2.1 1.7-1 2.1.5 2.2-3.8-1.5-1.6v-2l1.5-1.6-2.2-3.8-2.1.5-1.7-1-.6-2.1Z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
+        <div id="connection" class="connection" data-state="pending"><button id="model-indicator" type="button" aria-describedby="connection-tooltip"><span class="status-light" aria-hidden="true"></span><span id="connection-label" aria-live="polite">Ollama · 未選擇模型</span></button><span id="connection-tooltip" class="connection-tooltip" role="tooltip">尚未連接模型</span></div>
+        <div id="notice" role="status" aria-live="polite" hidden></div>
+      </div>
       <div class="document-toolbar">
-        <label class="upload"><span id="upload-label">選取 .docx 文件</span><input id="document-file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
+        <label class="upload"><span id="upload-label">選取文件</span><input id="document-file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
         <div class="actions"><button id="clear-file" type="button">清除</button><button id="convert-preview" class="primary" type="button">分析並轉換</button><button id="cancel-ai" type="button" hidden>取消處理</button><button id="export" type="button" title="依目前規格產生文件與驗證報告，不包含右側手動編輯。">下載轉換檔與報告</button><button id="download-edited" type="button" title="包含右側手動編輯，不附程式轉換的保留驗證報告。" hidden>下載編輯後文件</button></div>
       </div>
-      <p id="filename" class="helper" hidden></p>
-      <div class="actions"><span id="analysis-mode" class="helper">規則分析 · 未選模型</span><button id="inspect-paragraphs" type="button" hidden>進階段落檢查</button></div>
-      <div id="warnings" class="warnings" hidden></div>
+      <p id="filename" class="visually-hidden" hidden></p>
+      <div class="preview-switch" role="group" aria-label="文件預覽"><button type="button" data-view="original" aria-pressed="true">原始文件</button><button type="button" data-view="converted" aria-pressed="false">轉換後文件</button></div>
       <div class="preview-columns">
         <section class="preview-pane" aria-labelledby="original-title">
           <div class="preview-heading"><h2 id="original-title">原始文件</h2><span class="preview-kind" title="瀏覽器版面預覽，實際分頁以 Word 為準。">版面預覽</span></div>

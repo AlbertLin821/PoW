@@ -24,13 +24,14 @@ function connectionStatus(status,description){
 }
 function modelSelectionStatus(){
  const selected=$('#model').value.trim();
- $('#analysis-mode').textContent=selected?`AI 分析 · ${selected}`:'規則分析 · 未選模型';
  if(!state.providerReady)connectionStatus('pending','尚未連接模型');
  else if(!selected)connectionStatus('pending','尚未選擇模型');
  else if(state.models.includes(selected))connectionStatus('ready','模型已連接');
  else connectionStatus('pending','尚未確認模型');
 }
-function toggleSettings(open){$('#settings-panel').hidden=!open;$('.workbench').classList.toggle('settings-open',open);$('#toggle-settings').setAttribute('aria-expanded',String(open));}
+function selectPanel(id){for(const panel of document.querySelectorAll('.settings-content > details'))panel.open=panel.id===id;for(const button of document.querySelectorAll('[data-panel]'))button.setAttribute('aria-pressed',String(button.dataset.panel===id));}
+function toggleSettings(open,panel){$('#settings-panel').hidden=!open;$('.workbench').classList.toggle('settings-open',open);$('#toggle-settings').setAttribute('aria-expanded',String(open));if(panel)selectPanel(panel);}
+function selectView(side){$('.preview-columns').dataset.view=side;for(const button of document.querySelectorAll('[data-view]'))button.setAttribute('aria-pressed',String(button.dataset.view===side));}
 function updateViewer(side,values){
  state.viewers[side]={...state.viewers[side],...values};
 }
@@ -74,7 +75,7 @@ async function api(path,options={}){
  return response;
 }
 function setProfile(profile){if(state.ai)cancelAI();invalidatePreview();for(const [k,v] of Object.entries(profile)){const e=$(`[name="${k}"]`);if(e){if(e.type==='checkbox')e.checked=v;else e.value=v;}}render();}
-function profile(){if(!$('#profile-form').checkValidity()){toggleSettings(true);$('#profile-settings').open=true;$('#profile-form').reportValidity();throw new Error('請先修正格式規格的欄位。');}const p={};for(const [k,,type] of fields)p[k]=type==='number'?Number($(`[name="${k}"]`).value):$(`[name="${k}"]`).value.trim();p.alignment=$('[name=alignment]').value;p.new_page_chapters=$('[name=new_page_chapters]').checked;return p;}
+function profile(){if(!$('#profile-form').checkValidity()){toggleSettings(true,'profile-settings');$('#advanced-format').open=true;$('#profile-form').reportValidity();throw new Error('請先修正格式規格的欄位。');}const p={};for(const [k,,type] of fields)p[k]=type==='number'?Number($(`[name="${k}"]`).value):$(`[name="${k}"]`).value.trim();p.alignment=$('[name=alignment]').value;p.new_page_chapters=$('[name=new_page_chapters]').checked;return p;}
 function formatText(r){return r.formats.map(f=>`${f.chinese_font} / ${f.latin_font}，${f.size} pt${f.bold?'，粗體':''}`).join('；')||'未包含一般文字';}
 function differences(r,p,role){
  if(role==='keep'||!r.editable)return ['保留原樣'+(r.skip_reason?'：'+r.skip_reason:'')];
@@ -83,13 +84,13 @@ function differences(r,p,role){
  if(r.formats.some(f=>f.size!==size))out.push(`字級改為 ${size} pt`);
  if(heading&&r.formats.some(f=>!f.bold))out.push('標題加粗');
  const align=heading?'left':p.alignment;if(r.alignment!==align)out.push('調整段落對齊');
- if((heading?0:p.first_line_chars)!==r.first_line_chars)out.push(`首行縮排 ${heading?0:p.first_line_chars} 字`);
- if(r.left_indent_pt||r.right_indent_pt)out.push('清除左右段落縮排');
+ if(!r.numbered_heading&&(heading?0:p.first_line_chars)!==r.first_line_chars)out.push(`首行縮排 ${heading?0:p.first_line_chars} 字`);
+ if(!r.numbered_heading&&(r.left_indent_pt||r.right_indent_pt))out.push('清除左右段落縮排');
  if(r.line_spacing!==p.line_spacing)out.push(`行距 ${p.line_spacing} 倍`);
  if($('#clean-leading').checked&&!heading&&r.leading)out.push(`移除 ${r.leading} 個段首空白／Tab`);
  if(r.space_before!==(heading&&role!=='heading1'?size:0)||r.space_after!==(role==='heading1'?size:p.paragraph_after))out.push('調整段前與段後間距');
  if(r.outline_level!==(heading?Number(role.slice(-1))-1:9))out.push('設定段落大綱層級');
- if(r.page_break_before!==(role==='heading1'&&p.new_page_chapters&&r.id!=='p-1'))out.push('調整段前分頁');
+ if(!r.page_break_before&&role==='heading1'&&p.new_page_chapters&&r.id!=='p-1')out.push('章標題從新頁開始');
  return out;
 }
 function render(){
@@ -99,7 +100,8 @@ function render(){
  const box=$('#paragraphs');box.replaceChildren();const filter=$('#filter').value;
  $('#empty').hidden=!!state.doc;$('#ai-tools').hidden=!state.doc;
  $('#inspect-paragraphs').hidden=!state.doc;
- $('#inspect-paragraphs').textContent=state.needsReview.size?`檢查段落（${state.needsReview.size} 段待確認）`:'進階段落檢查';
+ $('#inspect-paragraphs').textContent=state.needsReview.size?`檢查（${state.needsReview.size}）`:'檢查';
+ $('#inspect-paragraphs').title=`${state.needsReview.size} 段待確認`;
  $('#counts').textContent=state.doc?`${state.rows.length} 段，${state.rows.filter(r=>!r.editable).length} 段略過`:'尚未載入文件';
  for(const r of state.rows){
   const role=state.roles.get(r.id)||'keep',diff=differences(r,p,role);
@@ -124,6 +126,7 @@ function cancelAI(){const running=!!state.ai;state.ai?.abort();state.ai=null;$('
 async function clearFile(resetInput=true){const epoch=++state.epoch;invalidatePreview();clearPreviews();cancelAI();const id=state.doc;state.doc=null;state.rows=[];state.roles.clear();state.reasons.clear();state.needsReview.clear();state.overrides.clear();if(resetInput)$('#document-file').value='';$('#filename').textContent='';$('#filename').hidden=true;$('#warnings').hidden=true;render();if(id)await api('/documents/'+id,{method:'DELETE'});return epoch;}
 async function upload(file){
  const epoch=await clearFile(false);if(!file||epoch!==state.epoch)return;
+ selectView('original');
  if(!file.name.toLowerCase().endsWith('.docx'))throw new Error('只接受 .docx 文件，請不要直接改副檔名。');
  if(file.size>state.limits.file_mb*1024*1024)throw new Error(`檔案超過本次啟動的 ${state.limits.file_mb} MB 上限。`);
  notice('正在解析文件…');$('#empty').textContent='正在解析段落與格式…';
@@ -139,18 +142,20 @@ async function upload(file){
 }
 function action(id,fn){$(id).addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>notice(e.message,true)));}
 async function init(){
- $('#profile-settings').open=false;$('#model-settings').open=false;
+ selectPanel('profile-settings');selectView('original');toggleSettings(innerWidth>1000);
+ for(const button of document.querySelectorAll('[data-panel]'))button.addEventListener('click',()=>selectPanel(button.dataset.panel));
+ for(const button of document.querySelectorAll('[data-view]'))button.addEventListener('click',()=>selectView(button.dataset.view));
  $('#toggle-settings').addEventListener('click',()=>toggleSettings($('#settings-panel').hidden));
- $('#model-indicator').addEventListener('click',()=>{toggleSettings(true);$('#model-settings').open=true;$('#provider').focus();});
+ $('#model-indicator').addEventListener('click',()=>{toggleSettings(true,'model-settings');$('#provider').focus();});
  $('#connection').addEventListener('mouseleave',()=>delete $('#connection').dataset.dismissed);
  $('#connection').addEventListener('focusout',()=>delete $('#connection').dataset.dismissed);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#connection').dataset.dismissed='true';});
- for(const [name,title,type,min,max,wide] of fields){const label=node('label',title,wide?'wide':'');const input=node('input');input.name=name;input.type=type;input.required=true;if(type==='number'){input.min=min;input.max=max;input.step='.5';}else input.maxLength=80;label.append(input);$('#profile-fields').append(label);}
+ for(const [name,title,type,min,max,wide] of fields){const label=node('label',title,wide?'wide':'');const input=node('input');input.name=name;input.type=type;input.required=true;if(type==='number'){input.min=min;input.max=max;input.step='.5';}else input.maxLength=80;label.append(input);const basic=['chinese_font','latin_font','body_size','first_line_chars','line_spacing','paragraph_after'].includes(name);$(basic?'#profile-fields':'#advanced-fields').append(label);}
  const response=await fetch('/api/session');if(!response.ok)throw new Error('本機服務無法連接。');const data=await response.json();state.token=data.token;state.defaults=data.profile;state.limits=data.limits||state.limits;$('#upload-label').textContent=`選取 .docx 文件（上限 ${state.limits.file_mb} MB）`;setProfile(data.profile);notice('');connectionStatus('pending','尚未連接模型');
  $('#profile-form').addEventListener('input',()=>{if(state.ai)cancelAI();invalidatePreview();render();});
  $('#filter').addEventListener('change',render);$('#clean-leading').addEventListener('change',()=>{if(state.ai)cancelAI();invalidatePreview();render();});
  $('#ai-consent').addEventListener('change',()=>{if(state.ai)cancelAI();});
- action('#inspect-paragraphs',()=>{toggleSettings(true);$('#review').open=true;$('#review-title').focus();$('#review').scrollIntoView({block:'nearest'});});
+ action('#inspect-paragraphs',()=>toggleSettings(true,'review'));
  $('#document-file').addEventListener('change',e=>{const file=e.target.files[0];upload(file).catch(e=>notice(e.message,true));});
  action('#clear-file',async()=>{await clearFile();notice('文件已清除。');});
  action('#reset-roles',()=>{cancelAI();invalidatePreview();for(const r of state.rows)state.roles.set(r.id,r.editable?r.role:'keep');state.reasons.clear();state.needsReview.clear();state.overrides.clear();render();notice('已還原規則角色建議。');});
@@ -171,7 +176,7 @@ async function init(){
   if(!state.doc)throw new Error('請先選取文件。');if(!state.canExport)throw new Error('此文件目前只能檢查。');
   const p=profile(),model=$('#model').value.trim();
   if(model&&(!state.providerReady||!$('#ai-consent').checked)){
-   toggleSettings(true);$('#model-settings').open=true;
+   toggleSettings(true,'model-settings');
    throw new Error(!state.providerReady?'請先連接選定的模型服務。':'請在模型設定同意將文件段落送至所選服務。');
   }
   if(state.converted&&!confirm('重新轉換會取代右側的手動編輯，是否繼續？'))return;
@@ -202,6 +207,7 @@ async function init(){
    if(!current())return;
    state.converted=true;
    state.convertedRevision=revision;
+   if(innerWidth<=650)selectView('converted');
    $('#converted-state').textContent=shown?'已轉換，可編輯':'已轉換，預覽未顯示';$('#download-edited').hidden=!shown;
    notice(`已完成${model?' AI':'規則'}分析與轉換。${state.needsReview.size?`有 ${state.needsReview.size} 段建議確認，可開啟段落檢查。`:''}`);
   }catch(e){
