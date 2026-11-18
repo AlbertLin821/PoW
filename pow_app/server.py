@@ -40,7 +40,8 @@ async def local_guard(request:Request,call_next):
     if host not in ('127.0.0.1','localhost','testserver','::1'):
         return JSONResponse({'detail':'只允許本機存取。'},status_code=403)
     origin=request.headers.get('origin')
-    if origin and origin!=str(request.base_url).rstrip('/'):
+    isolated_asset=request.method=='GET' and request.url.path.startswith('/static/extend/') and origin=='null'
+    if origin and origin!=str(request.base_url).rstrip('/') and not isolated_asset:
         return JSONResponse({'detail':'不接受其他網站的請求。'},status_code=403)
     if request.url.path.startswith('/api/') and request.url.path!='/api/session':
         if not secrets.compare_digest(request.headers.get('x-pow-token',''),TOKEN):
@@ -56,7 +57,9 @@ async def local_guard(request:Request,call_next):
     response.headers['X-Content-Type-Options']='nosniff'
     response.headers['Referrer-Policy']='no-referrer'
     response.headers['Cache-Control']='no-store'
-    response.headers['Content-Security-Policy']=("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: blob:; font-src data: blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'" if request.url.path=='/static/preview.html' else "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+    response.headers['Content-Security-Policy']=("default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' blob:; img-src data: blob:; font-src 'self' data: blob:; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'" if request.url.path=='/static/preview.html' else "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+    if request.url.path.startswith('/static/extend/'):
+        response.headers['Access-Control-Allow-Origin']='*'
     return response
 
 @app.exception_handler(DocumentError)

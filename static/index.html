@@ -61,30 +61,18 @@
     <div class="document-region">
       <div class="document-toolbar">
         <label class="upload"><span id="upload-label">選取 .docx 文件</span><input id="document-file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
-        <div class="actions"><button id="clear-file" type="button">清除</button><button id="convert-preview" class="primary" type="button">轉換預覽</button><button id="export" type="button">下載修正版與報告</button></div>
+        <div class="actions"><button id="clear-file" type="button">清除</button><button id="convert-preview" class="primary" type="button">轉換預覽</button><button id="export" type="button" title="依目前規格產生文件與驗證報告，不包含右側手動編輯。">下載轉換檔與報告</button><button id="download-edited" type="button" title="包含右側手動編輯，不附程式轉換的保留驗證報告。" hidden>下載編輯後文件</button></div>
       </div>
       <p id="filename" class="helper" hidden></p>
       <div id="warnings" class="warnings" hidden></div>
       <div class="preview-columns">
         <section class="preview-pane" aria-labelledby="original-title">
           <div class="preview-heading"><h2 id="original-title">原始文件</h2><span class="preview-kind" title="瀏覽器版面預覽，實際分頁以 Word 為準。">版面預覽</span></div>
-          <div class="viewer-toolbar" data-viewer="original" aria-label="原始文件預覽工具列">
-            <button type="button" data-viewer-action="previous" aria-label="原始文件上一頁" disabled><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m14 6-6 6 6 6"/></svg></button>
-            <label class="page-control">預覽頁<input type="number" min="1" value="1" data-viewer-page aria-label="原始文件預覽頁碼" disabled><span data-viewer-total>/ 0</span></label>
-            <button type="button" data-viewer-action="next" aria-label="原始文件下一頁" disabled><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m10 6 6 6-6 6"/></svg></button>
-            <label class="zoom-control">縮放<select data-viewer-zoom aria-label="原始文件縮放" disabled><option value="fit">符合寬度</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select></label>
-          </div>
-          <div class="preview-stage"><p id="original-placeholder" class="preview-placeholder">選取文件後顯示預覽</p><iframe id="original-preview" title="原始 Word 文件預覽" sandbox="allow-scripts" src="/static/preview.html" hidden></iframe></div>
+          <div class="preview-stage"><p id="original-placeholder" class="preview-placeholder">選取文件後顯示預覽</p><iframe id="original-preview" title="原始 Word 文件預覽" sandbox="allow-scripts" src="about:blank" hidden></iframe></div>
         </section>
         <section class="preview-pane" aria-labelledby="converted-title">
           <div class="preview-heading"><h2 id="converted-title">轉換後文件</h2><span id="converted-state" class="preview-kind">尚未轉換</span></div>
-          <div class="viewer-toolbar" data-viewer="converted" aria-label="轉換後文件預覽工具列">
-            <button type="button" data-viewer-action="previous" aria-label="轉換後文件上一頁" disabled><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m14 6-6 6 6 6"/></svg></button>
-            <label class="page-control">預覽頁<input type="number" min="1" value="1" data-viewer-page aria-label="轉換後文件預覽頁碼" disabled><span data-viewer-total>/ 0</span></label>
-            <button type="button" data-viewer-action="next" aria-label="轉換後文件下一頁" disabled><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m10 6 6 6-6 6"/></svg></button>
-            <label class="zoom-control">縮放<select data-viewer-zoom aria-label="轉換後文件縮放" disabled><option value="fit">符合寬度</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select></label>
-          </div>
-          <div class="preview-stage"><p id="converted-placeholder" class="preview-placeholder">轉換後顯示預覽</p><iframe id="converted-preview" title="轉換後 Word 文件預覽" sandbox="allow-scripts" src="/static/preview.html" hidden></iframe></div>
+          <div class="preview-stage"><p id="converted-placeholder" class="preview-placeholder">轉換後顯示預覽</p><iframe id="converted-preview" title="轉換後 Word 文件預覽" sandbox="allow-scripts" src="about:blank" hidden></iframe></div>
         </section>
       </div>
     </div>

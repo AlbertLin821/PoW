@@ -144,3 +144,19 @@ def test_large_image_document_over_old_limit_is_accepted():
     assert len(data)>15*1024*1024
     d=WordDocument(data)
     assert len(d.rows)==2
+
+def test_tab_stop_definition_is_not_document_text():
+    p='<w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="480"/><w:tab w:val="left" w:pos="960"/></w:tabs></w:pPr><w:r><w:t>定位點</w:t><w:tab/><w:t>實際Tab</w:t></w:r></w:p>'
+    d=WordDocument(fixture(p));assert d.rows[0]['text']=='定位點\t實際Tab';assert d.rows[0]['tabs']==1
+    out,report=d.export(Profile(),[Selection(paragraph_id='p-1',role='body')])
+    assert WordDocument(out).rows[0]['text']=='定位點\t實際Tab'
+    assert report['verification']['text_preserved_except_approved_leading']
+
+
+def test_sandbox_can_fetch_document_assets_but_not_api():
+    with TestClient(app) as client:
+        response=client.get('/static/extend/preview.js',headers={'origin':'null'})
+        assert response.status_code==200
+        assert response.headers['access-control-allow-origin']=='*'
+        assert client.get('/api/session',headers={'origin':'null'}).status_code==403
+        assert client.get('/static/app.js',headers={'origin':'null'}).status_code==403

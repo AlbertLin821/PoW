@@ -43,8 +43,9 @@ def merge(target, source):
             target[key]['val'] = '1'
 
 def text_of(p):
-    return ''.join(n.text or '' if n.tag==q('t') else '\t' if n.tag==q('tab') else '\n'
-                   for n in p.iter() if n.tag in (q('t'), q('tab'), q('br'), q('cr')))
+    # Paragraph tab-stop definitions use w:tab too; they are not text characters.
+    nodes=p.xpath('.//w:t[not(ancestor::w:pPr or ancestor::w:rPr)] | .//w:tab[not(ancestor::w:pPr or ancestor::w:rPr)] | .//w:br[not(ancestor::w:pPr or ancestor::w:rPr)] | .//w:cr[not(ancestor::w:pPr or ancestor::w:rPr)]',namespaces=NS)
+    return ''.join((n.text or '') if n.tag==q('t') else '\t' if n.tag==q('tab') else '\n' for n in nodes)
 
 def guess(text, outline):
     if outline is not None and outline.isdigit() and int(outline)<4:
@@ -172,7 +173,7 @@ class WordDocument:
                 'space_before':float(sp.get('before',0))/20,'space_after':float(sp.get('after',0))/20,
                 'outline_level':int(pp.get('outlineLvl',{}).get('val',9)),
                 'page_break_before':pp.get('pageBreakBefore',{}).get('val','0') not in ('0','false','off'),
-                'tabs':len(p.findall('.//'+q('tab'))),'leading':len(text)-len(text.lstrip(' \t\u3000')),
+                'tabs':len(p.xpath('.//w:tab[not(ancestor::w:pPr or ancestor::w:rPr)]',namespaces=NS)),'leading':len(text)-len(text.lstrip(' \t\u3000')),
                 'style':value(p.find(q('pPr')),'pStyle',default=self.default_style)}
 
     def summary(self):
@@ -240,14 +241,16 @@ class WordDocument:
         cols=sect.find(q('cols'))
         if cols is not None:sect.remove(cols)
         setprop(sect,'cols',num=1)
-        assert [text_of(p) for p in paras]==expected
+        if [text_of(p) for p in paras]!=expected:
+            raise DocumentError('內容保留檢查未通過，已停止匯出。')
         updated=ET.tostring(root,xml_declaration=True,encoding='UTF-8',standalone=True)
         buf=io.BytesIO()
         with zipfile.ZipFile(buf,'w',compression=zipfile.ZIP_DEFLATED) as z:
             for info in self.infos:z.writestr(info,updated if info.filename=='word/document.xml' else self.parts[info.filename])
         result=buf.getvalue()
         with zipfile.ZipFile(io.BytesIO(result)) as z:
-            assert all(z.read(n)==v for n,v in self.parts.items() if n!='word/document.xml')
+            if not all(z.read(n)==v for n,v in self.parts.items() if n!='word/document.xml'):
+                raise DocumentError('封裝保留檢查未通過，已停止匯出。')
         report={'changes':changes,'verification':{'text_preserved_except_approved_leading':True,'other_package_parts_unchanged':True,'word_rendered':False},
                 'profile':profile.model_dump(),'warnings':self.warnings,'page_layout':'已套用 A4 單欄及指定頁邊界；不新增頁碼。'}
         return result,report

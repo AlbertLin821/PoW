@@ -11,6 +11,10 @@
 !/start.ps1
 !/start.cmd
 !/DESIGN.md
+!/frontend/
+!/package.json
+!/package-lock.json
+**/node_modules/
 **/__pycache__/
 **/.pytest_cache/
 **/*.pyc

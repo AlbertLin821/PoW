@@ -24,7 +24,7 @@ python -m venv .venv
 
 macOS／Linux 可使用 `.venv/bin/python` 執行相同 Python 模組。Windows 啟動器以 Windows 實測；其他平台尚未測試。
 
-無資料庫、無前端建置程序、無外部字型或 CDN。第一次安裝套件需要網路；使用已安裝的本機模型時不需雲端 API。
+無資料庫、無外部字型或 CDN。倉庫附帶已建置的文件元件，正常啟動不需要 Node.js；修改元件時才需要 npm 建置。第一次安裝套件需要網路；使用已安裝的本機模型時不需雲端 API。
 
 ## 第一版流程
 
@@ -40,7 +40,8 @@ macOS／Linux 可使用 `.venv/bin/python` 執行相同 Python 模組。Windows 
 2. 選取 `.docx`，確認每段角色、目前格式與修改預覽。規則提供初步角色，可手動修正。
 3. 如需 AI，展開模型設定、連接服務、選擇模型，確認資料範圍後分析。
 4. 確認後下載 ZIP，內含 `corrected.docx` 與 `report.json`。原始檔不覆寫。
-5. 以左側原檔、右側轉換後的瀏覽器版面預覽核對，再在 Word 開啟輸出確認分頁。瀏覽器預覽不等同 Word 排版引擎，也不更新目錄欄位。
+5. 左側以 Extend DOCX Viewer 檢視原檔，右側以 Extend DOCX Editor 編輯轉換結果。「下載轉換檔與報告」提供後端驗證過的轉換結果；「下載編輯後文件」包含右側手動編輯，不附後端保留驗證報告。重新轉換會取代右側編輯，操作前會確認。
+6. 在 Word 開啟輸出確認分頁及複雜物件。瀏覽器元件不是 Word 排版引擎；編輯器重新匯出不享有後端局部修改的原文及封裝保留保證。
 
 ## AI 接入規劃
 
@@ -70,11 +71,20 @@ API key 保存在本機服務記憶體，不寫入瀏覽器儲存區或設定檔
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-目前19項自動化案例通過，並完成瀏覽器操作檢查、雙文件預覽、真實本機模型呼叫及 Word 匯出開啟檢查。詳見 [驗證紀錄](docs/verification.md)。
+目前21項自動化案例通過，並完成瀏覽器操作檢查、真實文件轉換及編輯下載、真實本機模型呼叫及 Word 匯出開啟檢查。詳見 [驗證紀錄](docs/verification.md)。
 
 ## 預覽依賴
 
-`static/vendor`附帶docx-preview 0.4.1（Apache-2.0）及JSZip 3.10.2（MIT授權選項）的發行檔與授權文字，不需要CDN或執行npm建置。兩個JavaScript檔合計約173 KB。保留第三方原始授權；以docx-preview將DOCX轉為HTML呈現，其分頁及欄位支援有限。
+使用 [Extend DOCX Viewer](https://ui.extend.ai/ui/docs/components/docx-viewer) 與 [DOCX Editor](https://ui.extend.ai/ui/docs/components/docx-editor) 的正式元件來源，搭配 `@extend-ai/react-docx` 0.15.0、React、Radix 與 Tailwind。來源在 `frontend/`，建置檔在 `static/extend/`，合計約23 MB，其中 WASM 約14 MB。所有執行資源由 localhost 提供，兩個元件分別置於隔離 iframe。
+
+修改文件元件時，安裝 Node.js 後執行：
+
+```powershell
+npm ci
+npm run build:viewer
+```
+
+版本、來源、授權與本機調整見 [第三方元件](frontend/README.md)。瀏覽器文件引擎仍可能無法完整呈現或保留部分 Word 功能，不能宣稱任意文件無損編輯。
 
 ## 處理原則
 

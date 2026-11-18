@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+@source './components';
+@theme inline {
+ --color-background: var(--background); --color-foreground: var(--foreground);
+ --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+ --color-border: var(--border); --color-input: var(--input); --color-ring: var(--ring);
+ --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+ --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+ --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+ --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+ --color-card: var(--background); --color-card-foreground: var(--foreground);
+ --color-destructive: var(--destructive); --radius-md: 4px; --radius-sm: 3px; --radius-lg: 6px;
+}
+:root { --background:#fafbfc; --foreground:#202a35; --muted:#edf0f3; --muted-foreground:#52606e; --border:#c5ccd4; --input:#8794a1; --ring:#175bb0; --primary:#175bb0; --primary-foreground:#ffffff; --secondary:#edf0f3; --secondary-foreground:#202a35; --accent:#e6edf7; --accent-foreground:#202a35; --popover:#ffffff; --popover-foreground:#202a35; --destructive:#a42525; --font-ui:'Segoe UI','Microsoft JhengHei',sans-serif; }
+html,body,#root { height:100%; margin:0; overflow:hidden; background:var(--background); color:var(--foreground); font-family:var(--font-ui); }
+button { cursor:pointer; }
+button:disabled { cursor:not-allowed; }
+:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+.preview-root { height:100%; min-width:0; }
+.preview-error { padding:24px; color:var(--destructive); }

@@ -1,9 +1,0 @@
-:root { --preview-paper: #ffffff; --preview-ground: #e9edf1; --preview-ink: #202b36; --preview-font: 'Segoe UI', 'Microsoft JhengHei', sans-serif; }
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; overflow-x: clip; background: var(--preview-ground); color: var(--preview-ink); font-family: var(--preview-font); }
-#preview-content { min-height: 100dvh; padding: 12px; }
-.docx-wrapper { background: var(--preview-ground) !important; padding: 0 !important; }
-.docx-wrapper > section.docx { margin-bottom: 12px !important; box-shadow: none !important; }
-body.manual-zoom { overflow-x: auto; }
-body.manual-zoom .docx-wrapper { align-items: flex-start; width: max-content; min-width: 100%; }
-a { pointer-events: none; }

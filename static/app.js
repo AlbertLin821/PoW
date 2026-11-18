@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const state = {token:'', defaults:null, doc:null, rows:[], roles:new Map(), reasons:new Map(), epoch:0, ai:null, providerReady:false, models:[], connectionVersion:0,limits:{file_mb:32,preview_mb:32},revision:0,converted:false,previewJobs:new Map(),viewers:{}};
+const state = {token:'', defaults:null, doc:null, rows:[], roles:new Map(), reasons:new Map(), epoch:0, ai:null, providerReady:false, models:[], connectionVersion:0,limits:{file_mb:32,preview_mb:32},revision:0,converted:false,previewJobs:new Map(),viewers:{},editedRequests:new Map()};
 const roleNames = {body:'正文',heading1:'章標題',heading2:'節標題',heading3:'小節標題',heading4:'次小節標題',keep:'保留原樣'};
 const fields = [
  ['chinese_font','中文字型','text',null,null,true],['latin_font','英文字型','text',null,null,true],
@@ -30,27 +30,27 @@ function modelSelectionStatus(){
 }
 function toggleSettings(open){$('#settings-panel').hidden=!open;$('.workbench').classList.toggle('settings-open',open);$('#toggle-settings').setAttribute('aria-expanded',String(open));}
 function updateViewer(side,values){
- const data=state.viewers[side]={...state.viewers[side],...values};const bar=$(`[data-viewer="${side}"]`);
- const input=bar.querySelector('[data-viewer-page]');if(document.activeElement!==input)input.value=data.page||1;input.max=data.total||1;input.disabled=!data.total;
- bar.querySelector('[data-viewer-total]').textContent='/ '+(data.total||0);
- bar.querySelector('[data-viewer-action=previous]').disabled=!data.total||data.page<=1;
- bar.querySelector('[data-viewer-action=next]').disabled=!data.total||data.page>=data.total;
- bar.querySelector('[data-viewer-zoom]').disabled=!data.total;
+ state.viewers[side]={...state.viewers[side],...values};
 }
-function viewerCommand(side,action,value){const viewer=state.viewers[side];if(viewer?.total)$('#'+side+'-preview').contentWindow.postMessage({type:'viewer-command',job:viewer.job,action,value},'*');}
-function invalidatePreview(){state.revision++;if(state.converted)$('#converted-state').textContent='設定已變更';}
+function invalidatePreview(){state.revision++;if(state.converted)$('#converted-state').textContent='設定已變更';$('#download-edited').hidden=true;}
 function exportBody(){return {profile:profile(),selections:[...state.roles].map(([paragraph_id,role])=>({paragraph_id,role})),clean_leading:$('#clean-leading').checked};}
-function clearPreviews(){for(const task of state.previewJobs.values()){clearTimeout(task.timer);task.resolve(false);}state.previewJobs.clear();for(const side of ['original','converted']){updateViewer(side,{job:null,page:1,total:0});$(`[data-viewer="${side}"] [data-viewer-zoom]`).value='fit';$('#'+side+'-preview').hidden=true;$('#'+side+'-preview').src='/static/preview.html';$('#'+side+'-placeholder').hidden=false;$('#'+side+'-placeholder').textContent=side==='original'?'選取文件後顯示預覽':'轉換後顯示預覽';}state.converted=false;$('#converted-state').textContent='尚未轉換';}
+function clearPreviews(){for(const task of state.previewJobs.values()){clearTimeout(task.timer);task.resolve(false);}state.previewJobs.clear();for(const task of state.editedRequests.values()){clearTimeout(task.timer);task.reject(new Error('文件已清除。'));}state.editedRequests.clear();for(const side of ['original','converted']){updateViewer(side,{job:null,page:1,total:0});$('#'+side+'-preview').hidden=true;$('#'+side+'-preview').src='about:blank';$('#'+side+'-placeholder').hidden=false;$('#'+side+'-placeholder').textContent=side==='original'?'選取文件後顯示預覽':'轉換後顯示預覽';}state.converted=false;$('#converted-state').textContent='尚未轉換';}
 function showPreview(side,blob){
  const frame=$('#'+side+'-preview'),placeholder=$('#'+side+'-placeholder');
- updateViewer(side,{job:null,page:1,total:0});$(`[data-viewer="${side}"] [data-viewer-zoom]`).value='fit';
+ updateViewer(side,{job:null,page:1,total:0});
  placeholder.hidden=false;frame.hidden=true;
  if(blob.size>state.limits.preview_mb*1024*1024){placeholder.textContent='文件較大，請下載後檢視';return Promise.resolve(false);}
  placeholder.textContent='正在產生預覽…';
  for(const [id,task]of state.previewJobs){if(task.side===side){clearTimeout(task.timer);task.resolve(false);state.previewJobs.delete(id);}}
- const job=crypto.randomUUID();updateViewer(side,{job,page:1,total:0});return new Promise(resolve=>{const timer=setTimeout(()=>{state.previewJobs.delete(job);placeholder.textContent='預覽逾時，仍可下載文件';resolve(false);},60000);state.previewJobs.set(job,{side,blob,resolve,timer,sent:false});frame.src='/static/preview.html?job='+job;});
+ const job=crypto.randomUUID();updateViewer(side,{job,page:1,total:0});return new Promise(resolve=>{const timer=setTimeout(()=>{state.previewJobs.delete(job);placeholder.textContent='預覽逾時，仍可下載文件';resolve(false);},120000);state.previewJobs.set(job,{side,blob,resolve,timer,sent:false});frame.src='/static/preview.html?job='+job+'&mode='+(side==='converted'?'editor':'viewer');});
 }
 window.addEventListener('message',async event=>{
+ if(['edited-bytes','edited-export-error'].includes(event.data?.type)){
+  const request=state.editedRequests.get(event.data.requestId);if(!request||event.source!==$('#converted-preview').contentWindow||event.data.job!==state.viewers.converted?.job)return;
+  clearTimeout(request.timer);state.editedRequests.delete(event.data.requestId);
+  if(event.data.type==='edited-bytes'&&event.data.buffer instanceof ArrayBuffer)request.resolve(event.data.buffer);else request.reject(new Error('編輯後文件匯出失敗。'));
+  return;
+ }
  if(event.data?.type==='preview-state'){
   for(const side of ['original','converted'])if(event.source===$('#'+side+'-preview').contentWindow&&state.viewers[side]?.job===event.data.job&&Number.isInteger(event.data.total)&&event.data.total>0&&Number.isInteger(event.data.page)&&event.data.page>=1&&event.data.page<=event.data.total)updateViewer(side,{page:event.data.page,total:event.data.total});
   return;
@@ -135,11 +135,6 @@ function action(id,fn){$(id).addEventListener('click',()=>Promise.resolve().then
 async function init(){
  $('#profile-settings').open=false;$('#model-settings').open=false;
  $('#toggle-settings').addEventListener('click',()=>toggleSettings($('#settings-panel').hidden));
- for(const side of ['original','converted']){const bar=$(`[data-viewer="${side}"]`);
-  for(const action of ['previous','next'])bar.querySelector(`[data-viewer-action=${action}]`).addEventListener('click',()=>viewerCommand(side,'page',state.viewers[side].page+(action==='next'?1:-1)));
-  bar.querySelector('[data-viewer-page]').addEventListener('change',e=>{const viewer=state.viewers[side];const page=Math.max(1,Math.min(viewer.total,Number(e.target.value)||1));e.target.value=page;viewerCommand(side,'page',page);});
-  bar.querySelector('[data-viewer-zoom]').addEventListener('change',e=>viewerCommand(side,'zoom',e.target.value));
- }
  $('#model-indicator').addEventListener('click',()=>{toggleSettings(true);$('#model-settings').open=true;$('#provider').focus();});
  $('#connection').addEventListener('mouseleave',()=>delete $('#connection').dataset.dismissed);
  $('#connection').addEventListener('focusout',()=>delete $('#connection').dataset.dismissed);
@@ -173,10 +168,16 @@ async function init(){
  action('#cancel-ai',cancelAI);
  action('#convert-preview',async()=>{
   if(!state.doc)throw new Error('請先選取文件。');if(!state.canExport)throw new Error('此文件目前只能檢查。');
+  if(state.converted&&!confirm('重新轉換會取代右側的手動編輯，是否繼續？'))return;
   const body=exportBody(),epoch=state.epoch,revision=state.revision,button=$('#convert-preview');button.disabled=true;button.setAttribute('aria-busy','true');$('#converted-state').textContent='轉換中';
   try{const response=await api('/documents/'+state.doc+'/preview',{method:'POST',json:body});const blob=await response.blob();if(epoch!==state.epoch||revision!==state.revision){$('#converted-state').textContent=state.doc?'設定已變更':'尚未轉換';return;}
-   state.converted=true;const shown=await showPreview('converted',blob);if(epoch===state.epoch)$('#converted-state').textContent=revision!==state.revision?'設定已變更':shown?'已轉換':'已轉換，預覽未顯示';
+   state.converted=true;const shown=await showPreview('converted',blob);if(epoch===state.epoch){$('#converted-state').textContent=revision!==state.revision?'設定已變更':shown?'已轉換，可編輯':'已轉換，預覽未顯示';$('#download-edited').hidden=!shown||revision!==state.revision;}
   }catch(e){if(epoch===state.epoch)$('#converted-state').textContent='轉換失敗';throw e;}finally{button.disabled=false;button.setAttribute('aria-busy','false');}
+ });
+ action('#download-edited',async()=>{
+  if(!state.converted||$('#download-edited').hidden)throw new Error('請先完成轉換。');
+  const epoch=state.epoch,job=state.viewers.converted?.job,button=$('#download-edited');button.disabled=true;
+  try{const buffer=await new Promise((resolve,reject)=>{const requestId=crypto.randomUUID();const timer=setTimeout(()=>{state.editedRequests.delete(requestId);reject(new Error('編輯文件匯出逾時。'));},60000);state.editedRequests.set(requestId,{resolve,reject,timer});$('#converted-preview').contentWindow.postMessage({type:'export-edited',job,requestId},'*');});if(epoch!==state.epoch||job!==state.viewers.converted?.job)return;blobDownload(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),'PoW-edited.docx');notice('已下載編輯後文件。');}finally{button.disabled=false;}
  });
  action('#export',async()=>{
   if(!state.doc)throw new Error('請先選取文件並確認段落角色。');if(!state.canExport)throw new Error('此文件包含尚未支援的結構，只能檢查。');

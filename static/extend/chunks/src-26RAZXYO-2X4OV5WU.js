@@ -1,0 +1,1 @@
+import{a,b as r,c as e,d as t,e as o}from"./chunk-TINHCYGW.js";import"./chunk-E3H45YZF.js";import"./chunk-EMBIDUMY.js";export{e as createMinimalDocxPackage,t as getPart,r as packageToArrayBuffer,a as parseDocx,o as withPart};
